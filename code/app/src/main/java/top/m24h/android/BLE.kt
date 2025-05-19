@@ -9,8 +9,12 @@ import android.bluetooth.BluetoothProfile
 import android.bluetooth.BluetoothStatusCodes
 import android.content.Context
 import androidx.annotation.RequiresPermission
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 open class GattReadWrite (val retry : Int =3) : BluetoothGattCallback() {
     var continuation : Continuation<Unit>? =null
@@ -146,5 +150,18 @@ open class GattReadWrite (val retry : Int =3) : BluetoothGattCallback() {
         tried=0
         try {gatt?.close()} catch(_:Exception) {}
         gatt=null
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    suspend inline fun suspendTimeoutClose(timeout:Long, crossinline action: GattReadWrite.(cont:Continuation<Unit>)->Unit) : Boolean {
+        try {
+            withTimeout(timeout) {
+                suspendCancellableCoroutine<Unit> { cont -> action(cont) }
+            }
+        } catch (_: TimeoutCancellationException) {
+            close()
+            return false
+        }
+        return true
     }
 }

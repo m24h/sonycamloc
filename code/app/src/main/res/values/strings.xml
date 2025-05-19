@@ -1,9 +1,10 @@
 <resources>
     <string name="app_name">Sony Camera Location</string>
+    <string name="app_version" translatable="false">1.01α</string>
     <string name="service_notify">Keep this notification to hold running</string>
-    <string name="channel_id">top.m24h.sonycamloc</string>
-    <string name="channel_name">Sony Camera Location</string>
-    <string name="channel_description">app notifications</string>
+    <string name="channel_id" translatable="false">top.m24h.sonycamloc</string>
+    <string name="channel_name" translatable="false">Sony Camera Location</string>
+    <string name="channel_description" translatable="false">app notifications</string>
     <string name="longitude">Lng:</string>
     <string name="latitude">Lat:</string>
     <string name="exit">Terminate</string>

@@ -28,7 +28,7 @@ open class DataBindActivity<B:ViewDataBinding> (val layoutId:Int)
  * data binding for ListView
  * about `itemSetNameJava`, for &lt;variable name="abc" type="V" /&gt;, it should be `setAbc`
  */
-open class DataBindListViewAdapter<V, T:ViewDataBinding, L:List<V>> (
+open class DataBindListViewAdapter<V, T:ViewDataBinding, L: Iterable<V>> (
     val context: Context,
     val itemLayoutID: Int,
     val itemSetNameJava: String,
@@ -40,7 +40,7 @@ open class DataBindListViewAdapter<V, T:ViewDataBinding, L:List<V>> (
     }
     @Suppress("unused")
     override fun getItem(position: Int): Any? {
-        return data[position]
+        return data.elementAt(position)
     }
     @Suppress("unused")
     override fun getItemId(position: Int): Long {
@@ -53,7 +53,7 @@ open class DataBindListViewAdapter<V, T:ViewDataBinding, L:List<V>> (
             } ?: DataBindingUtil.inflate(
                 LayoutInflater.from(context), itemLayoutID, parent, false
             )
-        data[position]?.let {
+        data.elementAt(position)?.let {
             binding.javaClass.getDeclaredMethod(
                 itemSetNameJava, it::class.java
             ).invoke(binding, it)

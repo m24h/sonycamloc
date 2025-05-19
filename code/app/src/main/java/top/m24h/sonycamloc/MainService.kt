@@ -31,11 +31,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import top.m24h.android.GattReadWrite
-import kotlin.coroutines.suspendCoroutine
 
 class MainService : Service() , IBinder by Binder() {
     companion object {
         val broadcastAction = MainService::class.qualifiedName!!
+        val bluetoothTimeout = 15000L
     }
     // device scanning interval, real values will be got from resources table later
     var interval=20
@@ -65,6 +65,7 @@ class MainService : Service() , IBinder by Binder() {
     // async jobs
     private val asyncScope =MainScope()
     private lateinit var loopActor : SendChannel<Unit>
+    private var loopCounter=0L
     // receive broadcast from others
     // message from others, should be register/unregister on create/destroy
     private val broadcastFilter=IntentFilter().apply {
@@ -215,15 +216,19 @@ class MainService : Service() , IBinder by Binder() {
                                Manifest.permission.ACCESS_FINE_LOCATION,
                                Manifest.permission.ACCESS_COARSE_LOCATION])
     private suspend fun loop() {
+        loopCounter++
+        debug("loop counter: $loopCounter")
         // if gatt is not created, try to connect device
         if (gattCall.gatt==null && cameraMAC?.isNotEmpty()==true) {
             val device = (getSystemService(BLUETOOTH_SERVICE) as BluetoothManager?)
                 ?.adapter?.takeIf { it.isEnabled && it.state == BluetoothAdapter.STATE_ON }
                 ?.getRemoteLeDevice(cameraMAC!!, BluetoothDevice.ADDRESS_TYPE_PUBLIC)
             if (device != null) {
-                suspendCoroutine<Unit> { cont ->
-                    gattCall.connect(device, this@MainService, cont)
+                debug("connect")
+                gattCall.suspendTimeoutClose (bluetoothTimeout) { cont ->
+                    connect(device, this@MainService, cont)
                 }
+                debug(if (gattCall.gatt != null) "connected" else "not connected")
                 if (gattCall.gatt != null) {
                     val srvRemote = gattCall.gatt!!.getService(SonyCam.SERVICE_REMOTE)
                     characteristicRemote = srvRemote?.getCharacteristic(SonyCam.CHAR_REMOTE_WRITE)
@@ -231,26 +236,27 @@ class MainService : Service() , IBinder by Binder() {
                     characteristicGPS = srvGPS?.getCharacteristic(SonyCam.CHAR_GPS_DATA)
                     characteristicGPS30 = srvGPS?.getCharacteristic(SonyCam.CHAR_GPS_SET30)
                     characteristicGPS31 = srvGPS?.getCharacteristic(SonyCam.CHAR_GPS_SET31)
-                    delay(500)
+                    debug("characteristics got")
                     characteristicGPS30?.let {
-                        suspendCoroutine<Unit> { cont ->
-                            gattCall.write(it, SonyCam.SET30_ENABLE, cont)
+                        gattCall.suspendTimeoutClose (bluetoothTimeout) { cont ->
+                            write(it, SonyCam.SET30_ENABLE, cont)
                         }
                         // twice for safe
-                        suspendCoroutine<Unit> { cont ->
-                            gattCall.write(it, SonyCam.SET30_ENABLE, cont)
+                        gattCall.suspendTimeoutClose (bluetoothTimeout) { cont ->
+                            write(it, SonyCam.SET30_ENABLE, cont)
                         }
                     }
-                    delay(500)
+                    debug("gps30 set")
                     characteristicGPS31?.let {
-                        suspendCoroutine<Unit> { cont ->
-                            gattCall.write(it, SonyCam.SET31_ENABLE, cont)
+                        gattCall.suspendTimeoutClose (bluetoothTimeout) { cont ->
+                            write(it, SonyCam.SET31_ENABLE, cont)
                         }
                         // twice for safe
-                        suspendCoroutine<Unit> { cont ->
-                            gattCall.write(it, SonyCam.SET31_ENABLE, cont)
+                        gattCall.suspendTimeoutClose (bluetoothTimeout) { cont ->
+                            write(it, SonyCam.SET31_ENABLE, cont)
                         }
                     }
+                    debug("gps31 set")
                 }
             }
         }
@@ -268,6 +274,13 @@ class MainService : Service() , IBinder by Binder() {
                         locationManager!!.requestLocationUpdates(
                             it, (interval - 2).toLong() * 1000L, 0.0f, locationListener
                         )
+                        locationUpdate=true
+                        // wait for first location data
+                        for (i in 1..10) {
+                            if (latitude!=null && longitude!=null)
+                                break
+                            delay(500)
+                        }
                     }
                 }
             }
@@ -282,14 +295,18 @@ class MainService : Service() , IBinder by Binder() {
             putExtra("canRemote", characteristicRemote!=null)
             putExtra("longitude", longitude?.toString())
             putExtra("latitude", latitude?.toString())
+            putExtra("loopCounter", loopCounter.toString())
         })
         // send GPS data to camera
         if (locEnable && gattCall.gatt!=null && longitude!=null && latitude!=null
-            && characteristicGPS!=null) suspendCoroutine<Unit> { cont ->
-            gattCall.write(
-                characteristicGPS!!,
-                SonyCam.makeGPSData(longitude!!, latitude!!, System.currentTimeMillis()),
-                cont)
+            && characteristicGPS!=null) {
+            gattCall.suspendTimeoutClose(bluetoothTimeout) { cont ->
+                gattCall.write(
+                    characteristicGPS!!,
+                    SonyCam.makeGPSData(longitude!!, latitude!!, System.currentTimeMillis()),
+                    cont
+                )
+            }
         }
     }
 

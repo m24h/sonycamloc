@@ -28,6 +28,7 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
     val canRemote = ObservableBoolean(false)
     val longitude = ObservableField<String>()
     val latitude = ObservableField<String>()
+    val loopCounter = ObservableField<String>()
     // data maintained by me
     val cameraMAC = ObservableField<String>()
     val cameraName = ObservableField<String>()
@@ -71,6 +72,8 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
                     longitude.set(intent.getStringExtra("longitude"))
                 if (intent.hasExtra("latitude"))
                     latitude.set(intent.getStringExtra("latitude"))
+                if (intent.hasExtra("loopCounter"))
+                    loopCounter.set(intent.getStringExtra("loopCounter"))
             }
         }
     }

@@ -12,18 +12,15 @@ import android.view.View
 import android.widget.AdapterView
 import android.widget.Toast
 import androidx.annotation.RequiresPermission
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import top.m24h.android.DataBindListViewAdapter
 import top.m24h.sonycamloc.databinding.ActivityScanBinding
 import top.m24h.sonycamloc.databinding.ScanListItemBinding
+import java.util.SortedSet
 
 class ScanActivity : AppActivity<ActivityScanBinding>(R.layout.activity_scan)
                      , AdapterView.OnItemClickListener {
     // listview of scan result
-    lateinit var listViewAdapter:DataBindListViewAdapter<ScanResult, ScanListItemBinding, MutableList<ScanResult>>
+    lateinit var listViewAdapter:DataBindListViewAdapter<ScanResult, ScanListItemBinding, SortedSet<ScanResult>>
     // scanner
     var scanner :BluetoothLeScanner? = null
     // on create / destroy
@@ -32,7 +29,15 @@ class ScanActivity : AppActivity<ActivityScanBinding>(R.layout.activity_scan)
         super.onCreate(savedInstanceState)
         binding.model = this
         // listview of scan result
-        listViewAdapter=DataBindListViewAdapter(this, R.layout.scan_list_item, "setItem", mutableListOf())
+        listViewAdapter=DataBindListViewAdapter(this, R.layout.scan_list_item, "setItem",
+            sortedSetOf<ScanResult>( object : Comparator<ScanResult> {
+                @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+                override fun compare(p0: ScanResult?, p1: ScanResult?): Int {
+                    return ((if (SonyCam.isSonyCam(p0?.scanRecord?.manufacturerSpecificData)) "A" else "B")+(p0?.device?.name?:""))
+                        .compareTo((if (SonyCam.isSonyCam(p1?.scanRecord?.manufacturerSpecificData)) "A" else "B")+(p1?.device?.name?:""))
+                }
+            })
+        )
         binding.deviceList.adapter = listViewAdapter
         binding.deviceList.onItemClickListener = this
         // just do scan
@@ -40,17 +45,6 @@ class ScanActivity : AppActivity<ActivityScanBinding>(R.layout.activity_scan)
             ?.adapter?.takeIf{it.isEnabled}?.bluetoothLeScanner
         scanner?.startScan(scanCallback)
             ?:Toast.makeText(this, R.string.ble_need_enable, Toast.LENGTH_LONG).show()
-        // show scanned results in bulk
-        lifecycleScope.launch {
-            while (isActive) {
-                listViewAdapter.data.sortBy {
-                    ((if (SonyCam.isSonyCam(it.scanRecord?.manufacturerSpecificData)) "A" else "B")
-                            +it.device.name!!)
-                }
-                listViewAdapter.notifyDataSetChanged()
-                delay(999)
-            }
-        }
     }
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     override fun onDestroy() {
@@ -64,12 +58,17 @@ class ScanActivity : AppActivity<ActivityScanBinding>(R.layout.activity_scan)
     }
     // process scanned devices
     val scanCallback = object: ScanCallback() {
+        var lastFlushTime=0L
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
             super.onScanResult(callbackType, result)
+            val now=System.currentTimeMillis()
             if (result?.device?.name?.isNotEmpty()==true && result.device?.address?.isNotEmpty()==true) {
-                listViewAdapter.data.removeIf { it.device.address==result.device.address }
                 listViewAdapter.data.add(result)
+                if (now-lastFlushTime>999) {
+                    lastFlushTime=now
+                    listViewAdapter.notifyDataSetChanged()
+                }
             }
         }
     }
@@ -79,7 +78,7 @@ class ScanActivity : AppActivity<ActivityScanBinding>(R.layout.activity_scan)
         // debouncing
         if (!binding.deviceList.isEnabled)  return
         binding.deviceList.isEnabled = false
-        val scanResult=listViewAdapter.data[pos]
+        val scanResult=listViewAdapter.data.elementAt(pos)
         if (scanResult.device.bondState != BluetoothDevice.BOND_BONDED) {
             Toast.makeText(this, R.string.ble_need_pair, Toast.LENGTH_LONG).show()
             binding.deviceList.isEnabled = true
