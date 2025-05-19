@@ -143,11 +143,11 @@ class MainService : Service() , IBinder by Binder() {
         }
         // ticker to run loop() according to some interval
         asyncScope.launch {
-            var tick=0
+            var lasttime=0L
             while (isActive) {
-                tick++
-                if (tick>(if (lazy && gattCall.gatt==null) intervalLazy else interval)) {
-                    tick=0
+                var now=System.currentTimeMillis()
+                if (((now-lasttime)/1000)>(if (lazy && gattCall.gatt==null) intervalLazy else interval)) {
+                    lasttime=now
                     loopActor.trySend(Unit)
                 }
                 delay(1000)
@@ -281,7 +281,7 @@ class MainService : Service() , IBinder by Binder() {
                         )
                         locationUpdate=true
                         // wait for first location data
-                        for (retry in 1..10) {
+                        for (i in 1..10) {
                             if (latitude!=null && longitude!=null)
                                 break
                             delay(500)

@@ -93,7 +93,7 @@ class SonyCam { companion object {
         val lng=round(longitude*10000000).toInt()
         data[15]=(lng shr 24).toByte() ; data[16]=(lng shr 16).toByte()
         data[17]=(lng shr 8).toByte() ; data[18]=lng.toByte()
-        calendarUTC.timeInMillis=timeInMillis
+        calendarUTC.timeInMillis=timeInMillis-20000
         val year=calendarUTC.get(Calendar.YEAR)
         data[19]=(year shr 8).toByte() ; data[20]=year.toByte()
         data[21]=(calendarUTC.get(Calendar.MONTH)+1).toByte()
