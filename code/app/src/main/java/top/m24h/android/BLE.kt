@@ -14,7 +14,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
 open class GattReadWrite (val retry : Int =3) : BluetoothGattCallback() {
     var continuation : Continuation<Unit>? =null
@@ -122,13 +121,15 @@ open class GattReadWrite (val retry : Int =3) : BluetoothGattCallback() {
         gatt: BluetoothGatt, status: Int, newState: Int
     ) {
         super.onConnectionStateChange(gatt, status, newState)
+        error=status
         if (status!=BluetoothGatt.GATT_SUCCESS
-            || newState!=BluetoothProfile.STATE_CONNECTED
-            || !gatt.discoverServices()) {
-            error=status
+            || newState!=BluetoothProfile.STATE_CONNECTED) {
             this.gatt=null
-            onStateChange()
+            try {gatt.close()} catch(_:Exception) {}
+        } else {
+            this.gatt=gatt
         }
+        onStateChange()
     }
 
     @Suppress("unused")
@@ -138,8 +139,23 @@ open class GattReadWrite (val retry : Int =3) : BluetoothGattCallback() {
         this.continuation=continuation
         error=BluetoothGatt.GATT_SUCCESS
         tried=0
+        try {gatt?.close()} catch(_:Exception) {}
         gatt=null
         device.connectGatt(context, false, this)
+    }
+
+    @Suppress("unused")
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    open fun discoverServices(continuation : Continuation<Unit>? =null) {
+        this.continuation=continuation
+        error=BluetoothGatt.GATT_SUCCESS
+        tried=0
+        if (gatt?.discoverServices()!=true) {
+            try {gatt?.close()} catch(_:Exception) {}
+            error=BluetoothGatt.GATT_FAILURE
+            gatt=null
+            onStateChange()
+        }
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
