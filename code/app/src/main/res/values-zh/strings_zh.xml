@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">索尼相机定位</string>
+    <string name="service_notify">这条通知是为了常驻, 不要移除</string>
+    <string name="channel_id">top.m24h.sonycamloc</string>
+    <string name="channel_name">Sony Camera Location</string>
+    <string name="channel_description">app notifications</string>
+    <string name="longitude">经度:</string>
+    <string name="latitude">维度:</string>
+    <string name="exit">停止运行</string>
+    <string name="scan">扫描蓝牙</string>
+    <string name="permission_need">需要权限</string>
+    <string name="permission_need_msg">为了正常运行, 蓝牙/定位/通知权限都是必要的\n尤其是"始终允许"定位, 安卓系统可能需要自己动手在专门的页面设置.</string>
+    <string name="dlg_ok">确定</string>
+    <string name="dlg_cancel">取消</string>
+    <string name="camera_not_set">请先绑定再扫描一台相机</string>
+    <string name="ble_need_pair">为了安全, 现在需要先在系统的界面完成蓝牙的配对, 本软件不能代劳.</string>
+    <string name="ble_need_enable">需要先打开蓝牙</string>
+    <string name="loc_enable">是否进行定位</string>
+    <string name="focus">对焦</string>
+    <string name="shot">拍摄</string>
+    <string name="zoom_t">远焦</string>
+    <string name="zoom_w">近焦</string>
+    <string name="lazy">省电偷懒模式</string>
+    <string name="description">https://github.com/m24h/sonycamloc \n我家的喵太可爱了</string>
+</resources>

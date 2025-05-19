@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">Sony Camera Location</string>
+    <string name="service_notify">Keep this notification to hold running</string>
+    <string name="channel_id">top.m24h.sonycamloc</string>
+    <string name="channel_name">Sony Camera Location</string>
+    <string name="channel_description">app notifications</string>
+    <string name="longitude">Lng:</string>
+    <string name="latitude">Lat:</string>
+    <string name="exit">Terminate</string>
+    <string name="scan">Scan</string>
+    <string name="permission_need">Need Permissions</string>
+    <string name="permission_need_msg">To work, Location and Bluetooth permissions are essential. Please manually enable these permissions required by the app, especially for the permission of "location all the time".</string>
+    <string name="dlg_ok">OK</string>
+    <string name="dlg_cancel">Cancel</string>
+    <string name="camera_not_set">Scan for a camera</string>
+    <string name="ble_need_pair">You need to pair it on system setting</string>
+    <string name="ble_need_enable">Is bluetooth enabled?</string>
+    <string name="loc_enable">Enable Location?</string>
+    <string name="focus">Focus</string>
+    <string name="shot">Shot</string>
+    <string name="zoom_t">Tele</string>
+    <string name="zoom_w">Wide</string>
+    <string name="lazy">Lazy</string>
+    <string name="description">https://github.com/m24h/sonycamloc \nI love photography and I love cats.</string>
+</resources>
