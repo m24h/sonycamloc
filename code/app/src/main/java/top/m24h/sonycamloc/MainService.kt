@@ -52,6 +52,8 @@ class MainService : Service() , IBinder by Binder() {
     var characteristicGPS:BluetoothGattCharacteristic?=null
     var characteristicGPS30:BluetoothGattCharacteristic?=null
     var characteristicGPS31:BluetoothGattCharacteristic?=null
+    var characteristicGPS32:BluetoothGattCharacteristic?=null
+    var characteristicGPS33:BluetoothGattCharacteristic?=null
     var characteristicRemote:BluetoothGattCharacteristic?=null
     // location
     var locationManager:LocationManager? =null
@@ -242,25 +244,36 @@ class MainService : Service() , IBinder by Binder() {
             characteristicGPS = srvGPS?.getCharacteristic(SonyCam.CHAR_GPS_DATA)
             characteristicGPS30 = srvGPS?.getCharacteristic(SonyCam.CHAR_GPS_SET30)
             characteristicGPS31 = srvGPS?.getCharacteristic(SonyCam.CHAR_GPS_SET31)
+            characteristicGPS32 = srvGPS?.getCharacteristic(SonyCam.CHAR_GPS_SET32)
+            characteristicGPS33 = srvGPS?.getCharacteristic(SonyCam.CHAR_GPS_SET33)
             characteristicGPS?:continue
             characteristicRemote?:continue
             debug("configCameraGPS")
             characteristicGPS30?.let {
                 gattCall.suspendTimeoutClose (bluetoothTimeout) { cont ->
-                    write(it, SonyCam.SET30_ENABLE, cont)
+                    write(it, SonyCam.SET3033_ENABLE, cont)
                 }
                 // twice for safe
                 gattCall.suspendTimeoutClose (bluetoothTimeout) { cont ->
-                    write(it, SonyCam.SET30_ENABLE, cont)
+                    write(it, SonyCam.SET3033_ENABLE, cont)
                 }
             }
             characteristicGPS31?.let {
                 gattCall.suspendTimeoutClose (bluetoothTimeout) { cont ->
-                    write(it, SonyCam.SET31_ENABLE, cont)
+                    write(it, SonyCam.SET3033_ENABLE, cont)
                 }
                 // twice for safe
                 gattCall.suspendTimeoutClose (bluetoothTimeout) { cont ->
-                    write(it, SonyCam.SET31_ENABLE, cont)
+                    write(it, SonyCam.SET3033_ENABLE, cont)
+                }
+            }
+            characteristicGPS32?.let {
+                gattCall.suspendTimeoutClose (bluetoothTimeout) { cont ->
+                    write(it, SonyCam.SET3033_ENABLE, cont)
+                }
+                // twice for safe
+                gattCall.suspendTimeoutClose (bluetoothTimeout) { cont ->
+                    write(it, SonyCam.SET3033_ENABLE, cont)
                 }
             }
             break

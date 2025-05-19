@@ -19,10 +19,20 @@ class SonyCam { companion object {
     val CHAR_GPS_DATA=UUID.fromString("0000DD11-0000-1000-8000-00805F9B34FB")!!
     @Suppress("unused")
     @JvmField
+    // GPS enable
     val CHAR_GPS_SET30=UUID.fromString("0000DD30-0000-1000-8000-00805F9B34FB")!!
     @Suppress("unused")
     @JvmField
+    // GPS enable
     val CHAR_GPS_SET31=UUID.fromString("0000DD31-0000-1000-8000-00805F9B34FB")!!
+    @Suppress("unused")
+    @JvmField
+    // GPS Time enable
+    val CHAR_GPS_SET32=UUID.fromString("0000DD32-0000-1000-8000-00805F9B34FB")!!
+    @Suppress("unused")
+    @JvmField
+    // TimeZone/DST enable
+    val CHAR_GPS_SET33=UUID.fromString("0000DD33-0000-1000-8000-00805F9B34FB")!!
     @Suppress("unused")
     @JvmField
     val SERVICE_REMOTE=UUID.fromString("8000FF00-FF00-FFFF-FFFF-FFFFFFFFFFFF")!!
@@ -31,10 +41,7 @@ class SonyCam { companion object {
     val CHAR_REMOTE_WRITE=UUID.fromString("0000FF01-0000-1000-8000-00805F9B34FB")!!
     @Suppress("unused")
     @JvmField
-    val SET30_ENABLE=byteArrayOf(1)
-    @Suppress("unused")
-    @JvmField
-    val SET31_ENABLE=byteArrayOf(1)
+    val SET3033_ENABLE=byteArrayOf(1)
     @Suppress("unused")
     @JvmField
     val REMOTE_FOCUS_DOWN=byteArrayOf(1,7)
@@ -93,7 +100,7 @@ class SonyCam { companion object {
         val lng=round(longitude*10000000).toInt()
         data[15]=(lng shr 24).toByte() ; data[16]=(lng shr 16).toByte()
         data[17]=(lng shr 8).toByte() ; data[18]=lng.toByte()
-        calendarUTC.timeInMillis=timeInMillis-20000
+        calendarUTC.timeInMillis=timeInMillis
         val year=calendarUTC.get(Calendar.YEAR)
         data[19]=(year shr 8).toByte() ; data[20]=year.toByte()
         data[21]=(calendarUTC.get(Calendar.MONTH)+1).toByte()
