@@ -13,7 +13,7 @@ class SonyCam { companion object {
     val SERVICE_GPS=UUID.fromString("8000DD00-DD00-FFFF-FFFF-FFFFFFFFFFFF")!!
     @Suppress("unused")
     @JvmField
-    val CHAR_GPS_CONF21=UUID.fromString("0000DD21-0000-1000-8000-00805F9B34FB")!!
+    val CHAR_GPS_CONF=UUID.fromString("0000DD21-0000-1000-8000-00805F9B34FB")!!
     @Suppress("unused")
     @JvmField
     val CHAR_GPS_DATA=UUID.fromString("0000DD11-0000-1000-8000-00805F9B34FB")!!
@@ -28,11 +28,11 @@ class SonyCam { companion object {
     @Suppress("unused")
     @JvmField
     // GPS Time enable
-    val CHAR_GPS_SET32=UUID.fromString("0000DD32-0000-1000-8000-00805F9B34FB")!!
+    val CHAR_GPS_SET_TIME=UUID.fromString("0000DD32-0000-1000-8000-00805F9B34FB")!!
     @Suppress("unused")
     @JvmField
     // TimeZone/DST enable
-    val CHAR_GPS_SET33=UUID.fromString("0000DD33-0000-1000-8000-00805F9B34FB")!!
+    val CHAR_GPS_SET_TIME_ZONE=UUID.fromString("0000DD33-0000-1000-8000-00805F9B34FB")!!
     @Suppress("unused")
     @JvmField
     val SERVICE_REMOTE=UUID.fromString("8000FF00-FF00-FFFF-FFFF-FFFFFFFFFFFF")!!
@@ -41,7 +41,7 @@ class SonyCam { companion object {
     val CHAR_REMOTE_WRITE=UUID.fromString("0000FF01-0000-1000-8000-00805F9B34FB")!!
     @Suppress("unused")
     @JvmField
-    val SET3033_ENABLE=byteArrayOf(1)
+    val GPS_ENABLE=byteArrayOf(1)
     @Suppress("unused")
     @JvmField
     val REMOTE_FOCUS_DOWN=byteArrayOf(1,7)
@@ -112,7 +112,7 @@ class SonyCam { companion object {
     }
     @Suppress("unused")
     @JvmStatic
-    fun isTZAndDSTNeeded(set21: ByteArray) : Boolean {
-        return set21.size>4 && (set21[4].toInt() and 2)==2
+    fun isTZAndDSTNeeded(conf21: ByteArray) : Boolean {
+        return conf21.size>4 && (conf21[4].toInt() and 2)==2
     }
 }}
