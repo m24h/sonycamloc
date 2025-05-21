@@ -207,16 +207,16 @@ class MainService : Service() , IBinder by Binder() {
             (getSystemService(BLUETOOTH_SERVICE) as BluetoothManager?)
                 ?.adapter?.takeIf { it.isEnabled && it.state == BluetoothAdapter.STATE_ON }
                 ?.getRemoteLeDevice(cameraMAC!!, BluetoothDevice.ADDRESS_TYPE_PUBLIC)
-                ?.let{ gatt=it.connectGatt(this, true, gattCallback)}
+                ?.let{gatt=it.connectGatt(this, true, gattCallback)}
         }
         // check if location is needed to start
         if (gattConnected && locEnable && characteristicGpsData!=null) {
             if (!location.isStarted()) {
                 if (location.start((interval - 2).toLong() * 1000L, 0.0f)) {
                     for (i in 1..30) {
-                        delay(200)
                         if (location.latitude != null && location.longitude != null)
                             break
+                        delay(200)
                     }
                 }
             }
@@ -235,10 +235,17 @@ class MainService : Service() , IBinder by Binder() {
         })
         // send GPS data to camera
         if (locEnable && characteristicGpsData!=null && location.latitude!=null && location.longitude!=null) {
-            // even when ble.isConnected is false, just try
-            characteristicGps30?.let{gattWrite(it, SonyCam.GPS_ENABLE)}
-            characteristicGps31?.let{gattWrite(it, SonyCam.GPS_ENABLE)}
-            characteristicGpsTime?.let{gattWrite(it, SonyCam.GPS_ENABLE)}
+            // even when isConnected is false, just try
+            if (!camInitialized) {
+                delay(200)
+                characteristicGps30?.let { gattWrite(it, SonyCam.GPS_ENABLE) }
+                delay(200)
+                characteristicGps31?.let { gattWrite(it, SonyCam.GPS_ENABLE) }
+                delay(200)
+                characteristicGpsTime?.let { gattWrite(it, SonyCam.GPS_ENABLE) }
+                delay(200)
+                camInitialized = gattConnected
+            }
             gattWrite(characteristicGpsData!!,
                 SonyCam.makeGPSData(location.longitude!!, location.latitude!!, System.currentTimeMillis()+600)
             )
@@ -255,6 +262,7 @@ class MainService : Service() , IBinder by Binder() {
     var characteristicRemote : BluetoothGattCharacteristic? =null
     var gatt : BluetoothGatt? =null
     var gattConnected = false
+    var camInitialized = false
     var gattWriteOk = false
     val gattCallback = object : BluetoothGattCallback() {
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
@@ -265,6 +273,13 @@ class MainService : Service() , IBinder by Binder() {
             if (status == BluetoothGatt.GATT_SUCCESS)
                 gattWriteOk = true
         }
+
+        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+        override fun onServiceChanged(gatt: BluetoothGatt) {
+            super.onServiceChanged(gatt)
+            gatt.discoverServices()
+        }
+
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             super.onServicesDiscovered(gatt, status)
@@ -278,17 +293,21 @@ class MainService : Service() , IBinder by Binder() {
                 characteristicGps31 = srvGPS?.getCharacteristic(SonyCam.CHAR_GPS_SET31)
                 characteristicGpsTime = srvGPS?.getCharacteristic(SonyCam.CHAR_GPS_SET_TIME)
                 characteristicGpsZone = srvGPS?.getCharacteristic(SonyCam.CHAR_GPS_SET_TIME_ZONE)
+                camInitialized=false
+                gattConnected=true
                 loopActor.trySend(Unit)
             }
         }
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             super.onConnectionStateChange(gatt, status, newState)
-            gattConnected = newState == BluetoothProfile.STATE_CONNECTED
-            if (gattConnected)
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
                 gatt.discoverServices()
-            else
+            } else {
+                gattConnected=false
+                camInitialized=false
                 loopActor.trySend(Unit)
+            }
         }
     }
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
@@ -301,20 +320,20 @@ class MainService : Service() , IBinder by Binder() {
         characteristicGpsZone=null
         characteristicRemote=null
         try {
-            gatt?.disconnect()
             gatt?.close()
         } catch (_:Exception) {}
         gatt=null
         gattConnected=false
+        camInitialized=false
     }
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private suspend fun gattWrite(characteristic: BluetoothGattCharacteristic, bytes: ByteArray) {
         gattWriteOk=false
         if (gatt?.writeCharacteristic(characteristic, bytes, characteristic.writeType)==BluetoothStatusCodes.SUCCESS) {
-            for (i in 0..30) {
-                delay(100)
+            for (i in 0..50) {
                 if (gattWriteOk)
                     break
+                delay(100)
             }
         }
     }

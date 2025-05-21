@@ -104,6 +104,7 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
             }
         }.launch(need.filter{!ActivityCompat.shouldShowRequestPermissionRationale(this@MainActivity, it)}.toTypedArray())
     }
+
     // on create / destroy
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
