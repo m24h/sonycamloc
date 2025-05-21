@@ -207,7 +207,8 @@ class MainService : Service() , IBinder by Binder() {
             (getSystemService(BLUETOOTH_SERVICE) as BluetoothManager?)
                 ?.adapter?.takeIf { it.isEnabled && it.state == BluetoothAdapter.STATE_ON }
                 ?.getRemoteLeDevice(cameraMAC!!, BluetoothDevice.ADDRESS_TYPE_PUBLIC)
-                ?.let{gatt=it.connectGatt(this, true, gattCallback)}
+                ?.let{gatt=it.connectGatt(this, true, gattCallback,
+                    BluetoothDevice.TRANSPORT_LE, BluetoothDevice.PHY_LE_2M_MASK)}
         }
         // check if location is needed to start
         if (gattConnected && locEnable && characteristicGpsData!=null) {
@@ -280,9 +281,8 @@ class MainService : Service() , IBinder by Binder() {
             gatt.discoverServices()
         }
 
-        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-        override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
-            super.onServicesDiscovered(gatt, status)
+        override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+            super.onMtuChanged(gatt, mtu, status)
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 val srvRemote = gatt.getService(SonyCam.SERVICE_REMOTE)
                 characteristicRemote = srvRemote?.getCharacteristic(SonyCam.CHAR_REMOTE_WRITE)
@@ -296,6 +296,14 @@ class MainService : Service() , IBinder by Binder() {
                 camInitialized=false
                 gattConnected=true
                 loopActor.trySend(Unit)
+            }
+        }
+
+        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+        override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+            super.onServicesDiscovered(gatt, status)
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                gatt.requestMtu(150)
             }
         }
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)

@@ -18,3 +18,4 @@ Currently only tested on my Xiaomi phone and Sony A7CR and expected me to have n
 # Known issues
 Sometimes the connection symbol appears on the camera, but the positioning symbol does not appear for a long time. When this happens, you can try to turn the camera back off and on, if it doesn't work, the next thing is to exit and re-enter the software, or even turn off the Bluetooth switch and re-open to clear the cache that may be behind.
 
+![main](pictures/main.png)
