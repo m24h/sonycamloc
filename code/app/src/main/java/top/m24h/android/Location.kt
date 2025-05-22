@@ -11,29 +11,35 @@ import androidx.annotation.RequiresPermission
 /**
  * a simple location implement
  */
-class Location (val context : Context) {
+open class Location (val context : Context) : LocationListener{
     var longitude: Double? = null
     var latitude: Double? = null
+    var started = false
+
     private var manager : LocationManager? = null
-    private var updater : LocationListener? = null
 
     /**
-     * is it running
+     * called when location is updated
      */
-    @Suppress("unused")
-    fun isStarted (): Boolean {
-        return updater!=null
+    override fun onLocationChanged(location: Location) {
+        longitude = location.longitude
+        latitude = location.latitude
     }
+
+    /**
+     * is started?
+     */
+    fun isStarted() =started
 
     /**
      * stop locating
      */
     @Suppress("unused")
     fun stop() {
-        try {
-            updater?.let { manager?.removeUpdates(it) }
+        if (started)  try {
+            started=false
+            manager?.removeUpdates(this)
         } catch (_: Exception) {}
-        updater = null
         longitude = null
         latitude = null
     }
@@ -47,20 +53,15 @@ class Location (val context : Context) {
     fun start(interval:Long, distance:Float) : Boolean {
         stop()
         manager = manager ?: (context.getSystemService(LOCATION_SERVICE) as LocationManager?)
-        (if (manager?.isProviderEnabled(LocationManager.FUSED_PROVIDER) == true)
-                LocationManager.FUSED_PROVIDER
-            else if (manager?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true)
-                LocationManager.GPS_PROVIDER
-            else null
-        ) ?.let {
-            updater = object : LocationListener {
-                override fun onLocationChanged(location: Location) {
-                    longitude = location.longitude
-                    latitude = location.latitude
-                }
-            }
-            manager!!.requestLocationUpdates(it, interval, distance, updater!!)
-        }
-        return (updater!=null)
+        manager ?.run { if (isProviderEnabled(LocationManager.FUSED_PROVIDER) == true)
+                            LocationManager.FUSED_PROVIDER
+                        else if (isProviderEnabled(LocationManager.GPS_PROVIDER) == true)
+                            LocationManager.GPS_PROVIDER
+                        else null }
+                    ?.let {
+                        manager!!.requestLocationUpdates(it, interval, distance, this)
+                        started=true
+                    }
+        return (started)
     }
 }

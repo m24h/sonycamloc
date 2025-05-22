@@ -14,8 +14,8 @@ android {
         applicationId = "top.m24h.sonycamloc"
         minSdk = 33
         targetSdk = 33
-        versionCode = 5
-        versionName = "1.11"
+        versionCode = 6
+        versionName = "1.20"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

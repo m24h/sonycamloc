@@ -20,6 +20,8 @@ import androidx.databinding.Observable
 import androidx.databinding.Observable.OnPropertyChangedCallback
 import androidx.databinding.ObservableBoolean
 import androidx.databinding.ObservableField
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import top.m24h.sonycamloc.databinding.ActivityMainBinding
 
 class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
@@ -33,14 +35,12 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
     val cameraMAC = ObservableField<String>()
     val cameraName = ObservableField<String>()
     val locEnable = ObservableBoolean(false)
-    val lazy = ObservableBoolean(false)
     // maintain settings
     private fun loadSettings() {
         with(getSharedPreferences("setting", MODE_PRIVATE)) {
             cameraMAC.set(getString("cameraMAC", null))
             cameraName.set(getString("cameraName", null))
             locEnable.set(getBoolean("locEnable", false))
-            lazy.set(getBoolean("lazy", false))
         }
     }
     private fun saveSettings() {
@@ -48,7 +48,6 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
             putString("cameraMAC", cameraMAC.get())
             putString("cameraName", cameraName.get())
             putBoolean("locEnable", locEnable.get())
-            putBoolean("lazy", lazy.get())
         }
     }
     private fun commandService(type:String) {
@@ -56,7 +55,6 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
             putExtra("type", type)
             putExtra("cameraMAC", cameraMAC.get())
             putExtra("locEnable", locEnable.get())
-            putExtra("lazy", lazy.get())
         })
     }
     // message from others, should be register/unregister on create/destroy
@@ -96,7 +94,7 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
                     .setTitle(R.string.permission_need)
                     .setMessage(R.string.permission_need_msg)
                     .create().apply {
-                        setOnDismissListener { this@MainActivity.finish()}
+                        setOnDismissListener { lifecycleScope.launch { this@MainActivity.finish()} }
                         setFinishOnTouchOutside(true)
                     } .show()
             } else {
@@ -124,7 +122,6 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
         cameraMAC.addOnPropertyChangedCallback(propertyChangedCallback)
         cameraName.addOnPropertyChangedCallback(propertyChangedCallback)
         locEnable.addOnPropertyChangedCallback(propertyChangedCallback)
-        lazy.addOnPropertyChangedCallback(propertyChangedCallback)
         // camera down-up (non-click) buttons
         setDownUpListener(binding.btnZoomW, ::onZoomW)
         setDownUpListener(binding.btnZoomT, ::onZoomT)

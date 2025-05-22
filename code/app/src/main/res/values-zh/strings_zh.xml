@@ -17,6 +17,5 @@
     <string name="shot">拍摄</string>
     <string name="zoom_t">远焦</string>
     <string name="zoom_w">近焦</string>
-    <string name="lazy">省电偷懒模式</string>
     <string name="description">https://github.com/m24h/sonycamloc \n我家的喵太可爱了</string>
 </resources>
