@@ -167,7 +167,6 @@ class MainService : Service() , IBinder by Binder() {
             "remote"-> {
                 intent.getByteArrayExtra("remote")?.let {
                     if (gatt!=null && characteristicRemote!=null) {
-                        //       ?.writeCharacteristic(characteristicRemote!!, it, characteristicRemote!!.writeType)
                         runBlocking { gattWrite(characteristicRemote!!, it) }
                     }
                 }
@@ -207,8 +206,7 @@ class MainService : Service() , IBinder by Binder() {
             (getSystemService(BLUETOOTH_SERVICE) as BluetoothManager?)
                 ?.adapter?.takeIf { it.isEnabled && it.state == BluetoothAdapter.STATE_ON }
                 ?.getRemoteLeDevice(cameraMAC!!, BluetoothDevice.ADDRESS_TYPE_PUBLIC)
-                ?.let{gatt=it.connectGatt(this, true, gattCallback,
-                    BluetoothDevice.TRANSPORT_LE, BluetoothDevice.PHY_LE_2M_MASK)}
+                ?.let  {gatt=it.connectGatt(this, true, gattCallback, BluetoothDevice.TRANSPORT_LE)}
         }
         // check if location is needed to start
         if (gattConnected && locEnable && characteristicGpsData!=null) {
@@ -282,14 +280,6 @@ class MainService : Service() , IBinder by Binder() {
         }
 
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-        override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
-            super.onMtuChanged(gatt, mtu, status)
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                gatt.discoverServices()
-            }
-        }
-
-        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             super.onServicesDiscovered(gatt, status)
             if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -311,7 +301,8 @@ class MainService : Service() , IBinder by Binder() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             super.onConnectionStateChange(gatt, status, newState)
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                gatt.requestMtu(150)
+                gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+                gatt.discoverServices()
             } else {
                 gattConnected=false
                 camInitialized=false
@@ -338,7 +329,7 @@ class MainService : Service() , IBinder by Binder() {
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private suspend fun gattWrite(characteristic: BluetoothGattCharacteristic, bytes: ByteArray) {
         gattWriteOk=false
-        if (gatt?.writeCharacteristic(characteristic, bytes, characteristic.writeType)==BluetoothStatusCodes.SUCCESS) {
+        if (gatt?.writeCharacteristic(characteristic, bytes, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)==BluetoothStatusCodes.SUCCESS) {
             for (i in 0..50) {
                 if (gattWriteOk)
                     break
