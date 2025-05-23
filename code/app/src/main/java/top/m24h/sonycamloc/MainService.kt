@@ -22,6 +22,7 @@ import android.content.pm.ServiceInfo
 import android.location.LocationManager
 import android.os.Binder
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
@@ -46,8 +47,9 @@ class MainService : Service() , IBinder by Binder() {
     private val asyncScope = MainScope()
     private lateinit var loopActor : SendChannel<Unit>
     private var loopCounter =0L
-    // for alarm manager
+    // for keeping alive
     private lateinit var alarmIntent : PendingIntent
+    private lateinit var wakeLock : PowerManager.WakeLock
     // receive message from others, should be register/unregister on create/destroy
     private val broadcastFilter=IntentFilter().apply {
         addAction(Intent.ACTION_SCREEN_ON)
@@ -134,14 +136,19 @@ class MainService : Service() , IBinder by Binder() {
         alarmIntent = PendingIntent.getService(this, 0,
                     Intent(this, MainService::class.java).putExtra("type", "alarm"),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        (getSystemService(ALARM_SERVICE) as AlarmManager?)
-            ?.setRepeating(AlarmManager.RTC_WAKEUP , System.currentTimeMillis()+5000,
+        (getSystemService(ALARM_SERVICE) as AlarmManager)
+            .setRepeating(AlarmManager.RTC_WAKEUP , System.currentTimeMillis()+5000,
                 resources.getInteger(R.integer.interval_ticker).toLong()*1000L, alarmIntent)
+        // try to keep CPU alive when connected
+        wakeLock=(getSystemService(POWER_SERVICE) as PowerManager).newWakeLock(
+                    PowerManager.PARTIAL_WAKE_LOCK or PowerManager.LOCATION_MODE_NO_CHANGE,
+                    "$packageName:wake")
         // try to start
         loopActor.trySend(Unit)
     }
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override fun onDestroy() {
+        if (wakeLock.isHeld) wakeLock.release()
         (getSystemService(ALARM_SERVICE) as AlarmManager?)?.cancel(alarmIntent)
         unregisterReceiver(broadcastReceiver)
         asyncScope.cancel()
@@ -219,7 +226,9 @@ class MainService : Service() , IBinder by Binder() {
                     }
                 }
             }
+            if (!wakeLock.isHeld) wakeLock.acquire(resources.getInteger(R.integer.wakelock_time).toLong()*1000L)
         } else if (location.isStarted()) {
+            if (wakeLock.isHeld) wakeLock.release()
             location.stop()
         }
         // send to main activity

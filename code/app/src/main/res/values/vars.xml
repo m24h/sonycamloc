@@ -2,4 +2,5 @@
 <resources>
     <integer name="interval_location">20</integer>
     <integer name="interval_ticker">300</integer>
+    <integer name="wakelock_time">1200</integer>
 </resources>
