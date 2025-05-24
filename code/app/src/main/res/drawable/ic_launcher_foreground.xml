@@ -20,5 +20,11 @@
       android:translateY="8.4">
     <path  android:fillColor="#FFFF4040" android:pathData="M16,11.1C16,8.61 14.1,7 12,7s-4,1.61 -4,4.1c0,1.66 1.33,3.63 4,5.9C14.67,14.73 16,12.76 16,11.1zM12,12c-0.59,0 -1.07,-0.48 -1.07,-1.07c0,-0.59 0.48,-1.07 1.07,-1.07s1.07,0.48 1.07,1.07C13.07,11.52 12.59,12 12,12z"/>
   </group>
-
+  <group android:scaleX="0.6"
+      android:scaleY="0.6"
+      android:translateX="8.6"
+      android:translateY="15.4">
+    <path android:fillColor="@color/primary"
+        android:pathData="M0,0 h-2 l0,-1 h2 l0,-1 h-3 v3 h2 v1 h-2 v1 h3 l0,0z"/>
+  </group>
 </vector>
