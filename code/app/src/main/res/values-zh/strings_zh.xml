@@ -10,7 +10,7 @@
     <string name="dlg_ok">确定</string>
     <string name="dlg_cancel">取消</string>
     <string name="camera_not_set">请先绑定再扫描一台相机</string>
-    <string name="ble_need_pair">为了安全，现在需要先在系统的界面完成蓝牙的配对，本软件不能代劳。</string>
+    <string name="ble_need_pair">需要先在系统的界面完成蓝牙的配对。</string>
     <string name="ble_need_enable">需要先打开蓝牙</string>
     <string name="loc_enable">是否进行定位</string>
     <string name="focus">对焦</string>
