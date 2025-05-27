@@ -35,6 +35,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.runBlocking
 import top.m24h.android.Location
+import java.text.DateFormat
+import java.util.Date
 
 class MainService : Service() , IBinder by Binder() {
     companion object {
@@ -46,7 +48,7 @@ class MainService : Service() , IBinder by Binder() {
     // async jobs
     private val asyncScope = MainScope()
     private lateinit var loopActor : SendChannel<Unit>
-    private var loopCounter =0L
+    private var lastSyncTime : String? =null
     // for keeping alive
     private lateinit var alarmIntent : PendingIntent
     private lateinit var wakeLock : PowerManager.WakeLock
@@ -194,12 +196,12 @@ class MainService : Service() , IBinder by Binder() {
         }
     }
     // wait for an non-null object
-    private suspend fun <T> waitTimeout(timeoutMs:Int, whenGot:T? =null, interval: Int =100,checker:()->T?) : T? {
+    private suspend fun <T> waitTimeout(timeoutMs:Int, waitWhenGot:T? =null, interval: Int =100, checker:()->T?) : T? {
         var timeLeft = (timeoutMs+interval/2)/interval
         while (true) {
             val ret=checker()
-            if (ret==whenGot) {
-                if (--timeLeft<0) return whenGot
+            if (ret==waitWhenGot) {
+                if (--timeLeft<0) return waitWhenGot
                 delay(interval.toLong())
             } else return ret
         }
@@ -209,7 +211,6 @@ class MainService : Service() , IBinder by Binder() {
                                Manifest.permission.ACCESS_FINE_LOCATION,
                                Manifest.permission.ACCESS_COARSE_LOCATION])
     private suspend fun loop() {
-        loopCounter++
         // if gatt is not created, try to connect device
         if (gatt==null && cameraMAC?.isNotEmpty()==true) {
             (getSystemService(BLUETOOTH_SERVICE) as BluetoothManager?)
@@ -231,6 +232,25 @@ class MainService : Service() , IBinder by Binder() {
             if (wakeLock.isHeld) wakeLock.release()
             location.stop()
         }
+        // send GPS data to camera
+        if (gattConnected && locEnable && characteristicGpsData!=null
+            && location.latitude!=null && location.longitude!=null) {
+            cameraInitialized = cameraInitialized || (
+                    (characteristicGps30==null || gattWrite(characteristicGps30!!, SonyCam.GPS_ENABLE)==true)
+                 && (characteristicGps31==null || gattWrite(characteristicGps31!!, SonyCam.GPS_ENABLE)==true)
+                 && (characteristicGpsTime==null || gattWrite(characteristicGpsTime!!, SonyCam.GPS_ENABLE)==true))
+            if (cameraInitialized &&
+                gattWrite(characteristicGpsData!!, SonyCam.makeGPSData(
+                    location.longitude!!,
+                    location.latitude!!,
+                    System.currentTimeMillis() + 600
+                )) == true) {
+                lastSyncTime = DateFormat.getTimeInstance(DateFormat.MEDIUM).format(Date())
+            } else { // retry
+                delay(2000)
+                loopActor.trySend(Unit)
+            }
+        }
         // send to main activity
         sendBroadcast(Intent(broadcastAction).apply {
             flags=Intent.FLAG_RECEIVER_REPLACE_PENDING or Intent.FLAG_RECEIVER_REGISTERED_ONLY
@@ -239,20 +259,8 @@ class MainService : Service() , IBinder by Binder() {
             putExtra("canRemote", characteristicRemote!=null)
             putExtra("longitude", location.longitude?.toString())
             putExtra("latitude", location.latitude?.toString())
-            putExtra("loopCounter", loopCounter.toString())
+            putExtra("lastSyncTime", lastSyncTime)
         })
-        // send GPS data to camera
-        if (gattConnected && locEnable && characteristicGpsData!=null
-            && location.latitude!=null && location.longitude!=null) {
-            characteristicGps30?.let{ gattWrite(it, SonyCam.GPS_ENABLE) }
-            characteristicGps31?.let{ gattWrite(it, SonyCam.GPS_ENABLE) }
-            characteristicGpsTime?.let { gattWrite(it, SonyCam.GPS_ENABLE) }
-            gattWrite(characteristicGpsData!!, SonyCam.makeGPSData(
-                location.longitude!!,
-                location.latitude!!,
-                System.currentTimeMillis() + 600
-            ))
-        }
     }
     // location
     val location = object : Location(this) {
@@ -270,6 +278,7 @@ class MainService : Service() , IBinder by Binder() {
     var characteristicRemote : BluetoothGattCharacteristic? =null
     var gatt : BluetoothGatt? =null
     var gattConnected = false
+    var cameraInitialized = false
     var gattStatusOk : Boolean? = null
     val gattCallback = object : BluetoothGattCallback() {
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
@@ -281,8 +290,17 @@ class MainService : Service() , IBinder by Binder() {
         }
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         override fun onServiceChanged(gatt: BluetoothGatt) {
+            // The services used don't really change,
+            // and sometimes connecting leads to redundant discoveries,
+            // just after discoverServices() called each time when connected.
+            // so ignore it
             super.onServiceChanged(gatt)
-            if (gattConnected) gatt.discoverServices() // only after connected
+            /*
+            if (false && gattConnected) { // only after connected
+                gattConnected = false
+                gatt.discoverServices()
+            }
+             */
         }
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
@@ -297,6 +315,8 @@ class MainService : Service() , IBinder by Binder() {
                 characteristicGpsTime = srvGPS?.getCharacteristic(SonyCam.CHAR_GPS_SET_TIME)
                 characteristicGpsZone = srvGPS?.getCharacteristic(SonyCam.CHAR_GPS_SET_TIME_ZONE)
                 gattConnected=true
+                cameraInitialized=false
+                lastSyncTime=null
                 loopActor.trySend(Unit)
             }
         }
@@ -304,10 +324,13 @@ class MainService : Service() , IBinder by Binder() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             super.onConnectionStateChange(gatt, status, newState)
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+                // call discoverServices() each time when connected,
+                // it seems to reduce the time of wireless reconstruction.
+                // Ignore discoverServices() and use cached characteristics, which takes more time.
                 gatt.discoverServices()
             } else {
                 gattConnected=false
+                lastSyncTime=null
                 loopActor.trySend(Unit)
             }
         }
@@ -330,7 +353,10 @@ class MainService : Service() , IBinder by Binder() {
     private suspend fun gattWrite(characteristic: BluetoothGattCharacteristic, bytes: ByteArray) : Boolean? {
         gattStatusOk=null
         return if (gatt?.writeCharacteristic(characteristic, bytes, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
-                   ==BluetoothStatusCodes.SUCCESS) waitTimeout(3000) { gattStatusOk }
+                   ==BluetoothStatusCodes.SUCCESS)
+                    // 20s is a suitable number to wait for wireless reconstruction,
+                    // after which, communication is available
+                    waitTimeout(20000) { gattStatusOk }
                else false
     }
 }

@@ -20,8 +20,6 @@ import androidx.databinding.Observable
 import androidx.databinding.Observable.OnPropertyChangedCallback
 import androidx.databinding.ObservableBoolean
 import androidx.databinding.ObservableField
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
 import top.m24h.sonycamloc.databinding.ActivityMainBinding
 
 class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
@@ -30,7 +28,7 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
     val canRemote = ObservableBoolean(false)
     val longitude = ObservableField<String>()
     val latitude = ObservableField<String>()
-    val loopCounter = ObservableField<String>()
+    val lastSyncTime = ObservableField<String>()
     // data maintained by me
     val cameraMAC = ObservableField<String>()
     val cameraName = ObservableField<String>()
@@ -70,8 +68,8 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
                     longitude.set(intent.getStringExtra("longitude"))
                 if (intent.hasExtra("latitude"))
                     latitude.set(intent.getStringExtra("latitude"))
-                if (intent.hasExtra("loopCounter"))
-                    loopCounter.set(intent.getStringExtra("loopCounter"))
+                if (intent.hasExtra("lastSyncTime"))
+                    lastSyncTime.set(intent.getStringExtra("lastSyncTime"))
             }
         }
     }
@@ -93,10 +91,10 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
                 AlertDialog.Builder(this@MainActivity)
                     .setTitle(R.string.permission_need)
                     .setMessage(R.string.permission_need_msg)
-                    .create().apply {
-                        setOnDismissListener { lifecycleScope.launch { this@MainActivity.finish()} }
-                        setFinishOnTouchOutside(true)
-                    } .show()
+                    .setOnDismissListener { _ -> finish() }
+                    .create()
+                    .apply { setCanceledOnTouchOutside(true) }
+                    .show()
             } else {
                 commandService("start")
             }
@@ -120,7 +118,6 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
             }
         }
         cameraMAC.addOnPropertyChangedCallback(propertyChangedCallback)
-        cameraName.addOnPropertyChangedCallback(propertyChangedCallback)
         locEnable.addOnPropertyChangedCallback(propertyChangedCallback)
         // camera down-up (non-click) buttons
         setDownUpListener(binding.btnZoomW, ::onZoomW)
@@ -164,8 +161,6 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
             putExtra("type", "remote")
             putExtra("remote", remote)
         })
-
-        binding.cameraName.compoundDrawableTintMode
     }
     fun onZoomW(down:Boolean) {
         sendRemote(if (down) SonyCam.REMOTE_WIDE_DOWN else SonyCam.REMOTE_WIDE_UP)

@@ -232,13 +232,12 @@
             app:layout_constraintTop_toBottomOf="@+id/lngLat" />
 
         <TextView
-            android:id="@+id/loopCounter"
+            android:id="@+id/extraInfo"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="10dp"
             android:textSize="12sp"
-            android:text="@{model.loopCounter}"
-            app:layout_constraintLeft_toRightOf="@id/version"
+            android:text="@{model.lastSyncTime}"
+            app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintBottom_toBottomOf="@id/btnExit"
             tools:text="1234567890" />
 
@@ -248,7 +247,8 @@
             android:layout_height="wrap_content"
             android:text="@string/app_version"
             android:textSize="12sp"
-            app:layout_constraintBottom_toBottomOf="@id/btnExit"
+            android:layout_marginBottom="6dp"
+            app:layout_constraintBottom_toTopOf="@id/extraInfo"
             app:layout_constraintLeft_toLeftOf="parent" />
 
 

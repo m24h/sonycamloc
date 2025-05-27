@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">Sony Camera Location</string>
-    <string name="app_version" translatable="false">v1.21</string>
+    <string name="app_version" translatable="false">v1.22</string>
     <string name="service_notify">Keep this notification to hold running</string>
     <string name="channel_id" translatable="false">top.m24h.sonycamloc</string>
     <string name="channel_name" translatable="false">Sony Camera Location</string>
@@ -10,7 +10,7 @@
     <string name="exit">Terminate</string>
     <string name="scan">Scan</string>
     <string name="permission_need">Need Permissions</string>
-    <string name="permission_need_msg">To work, Location and Bluetooth permissions are essential. Please manually enable these permissions required by the app, especially for the permission like "location: all ways".</string>
+    <string name="permission_need_msg">To work, Location and Bluetooth permissions are essential. Please manually enable these permissions required by the app, especially for the permission like "location: allow all the time".</string>
     <string name="dlg_ok">OK</string>
     <string name="dlg_cancel">Cancel</string>
     <string name="camera_not_set">Scan for a camera</string>
