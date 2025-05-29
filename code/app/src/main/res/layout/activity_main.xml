@@ -64,22 +64,21 @@
             tools:checked="true" />
 
         <Switch
-            android:id="@+id/lazy"
+            android:id="@+id/faith"
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_marginTop="10dp"
             android:autoSizeMaxTextSize="36dp"
             android:autoSizeMinTextSize="20dp"
             android:autoSizeTextType="uniform"
-            android:checked="@{false}"
+            android:checked="@={model.faithMode}"
             android:drawableLeft="@drawable/cat"
             android:drawablePadding="10dp"
             android:drawableTint="@color/primary"
             android:splitTrack="false"
             android:switchMinWidth="60dp"
             android:switchPadding="20dp"
-            android:text=""
-            android:visibility="gone"
+            android:text="@string/faith_mode"
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent"
             app:layout_constraintTop_toBottomOf="@id/locEnable"
@@ -90,7 +89,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
-            app:layout_constraintTop_toBottomOf="@id/lazy"
+            app:layout_constraintTop_toBottomOf="@id/faith"
             app:layout_constraintVertical_bias="0.0">
 
             <TableRow
@@ -245,7 +244,7 @@
             android:id="@+id/version"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/app_version"
+            android:text="@{`v`+model.versionName}"
             android:textSize="12sp"
             android:layout_marginBottom="6dp"
             app:layout_constraintBottom_toTopOf="@id/extraInfo"

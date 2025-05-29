@@ -32,7 +32,7 @@ class SonyCam { companion object {
     @Suppress("unused")
     @JvmField
     // TimeZone/DST enable
-    val CHAR_GPS_SET_TIME_ZONE=UUID.fromString("0000DD33-0000-1000-8000-00805F9B34FB")!!
+    val CHAR_GPS_SET_ZONE=UUID.fromString("0000DD33-0000-1000-8000-00805F9B34FB")!!
     @Suppress("unused")
     @JvmField
     val SERVICE_REMOTE=UUID.fromString("8000FF00-FF00-FFFF-FFFF-FFFFFFFFFFFF")!!
@@ -42,6 +42,9 @@ class SonyCam { companion object {
     @Suppress("unused")
     @JvmField
     val GPS_ENABLE=byteArrayOf(1)
+    @Suppress("unused")
+    @JvmField
+    val GPS_DISABLE=byteArrayOf(0)
     @Suppress("unused")
     @JvmField
     val REMOTE_FOCUS_DOWN=byteArrayOf(1,7)

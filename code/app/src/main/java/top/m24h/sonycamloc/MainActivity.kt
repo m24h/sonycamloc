@@ -23,6 +23,7 @@ import androidx.databinding.ObservableField
 import top.m24h.sonycamloc.databinding.ActivityMainBinding
 
 class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
+    lateinit var versionName :String
     // data maintained by others
     val connected = ObservableBoolean(false)
     val canRemote = ObservableBoolean(false)
@@ -33,12 +34,14 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
     val cameraMAC = ObservableField<String>()
     val cameraName = ObservableField<String>()
     val locEnable = ObservableBoolean(false)
+    val faithMode = ObservableBoolean(false)
     // maintain settings
     private fun loadSettings() {
         with(getSharedPreferences("setting", MODE_PRIVATE)) {
             cameraMAC.set(getString("cameraMAC", null))
             cameraName.set(getString("cameraName", null))
             locEnable.set(getBoolean("locEnable", false))
+            faithMode.set(getBoolean("faithMode", false))
         }
     }
     private fun saveSettings() {
@@ -46,6 +49,7 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
             putString("cameraMAC", cameraMAC.get())
             putString("cameraName", cameraName.get())
             putBoolean("locEnable", locEnable.get())
+            putBoolean("faithMode", faithMode.get())
         }
     }
     private fun commandService(type:String) {
@@ -53,6 +57,7 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
             putExtra("type", type)
             putExtra("cameraMAC", cameraMAC.get())
             putExtra("locEnable", locEnable.get())
+            putExtra("faithMode", faithMode.get())
         })
     }
     // message from others, should be register/unregister on create/destroy
@@ -106,6 +111,8 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
         super.onCreate(savedInstanceState)
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
         binding.model = this
+        // get version name from package info
+        versionName= packageManager.getPackageInfo(packageName, 0).versionName?:""
         // load settings
         loadSettings()
         // start service
@@ -119,6 +126,7 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
         }
         cameraMAC.addOnPropertyChangedCallback(propertyChangedCallback)
         locEnable.addOnPropertyChangedCallback(propertyChangedCallback)
+        faithMode.addOnPropertyChangedCallback(propertyChangedCallback)
         // camera down-up (non-click) buttons
         setDownUpListener(binding.btnZoomW, ::onZoomW)
         setDownUpListener(binding.btnZoomT, ::onZoomT)
@@ -151,8 +159,9 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
             ActivityResultContracts.StartActivityForResult()
         ) { result ->
             if (result != null && result.resultCode == RESULT_OK && result.data != null) {
-                cameraMAC.set(result.data!!.getStringExtra("mac"))
+                // set cameraName first, it's not observed as a trigger
                 cameraName.set(result.data!!.getStringExtra("name"))
+                cameraMAC.set(result.data!!.getStringExtra("mac"))
             }
         }.launch(Intent(this, ScanActivity::class.java))
     }

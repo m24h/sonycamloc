@@ -10,6 +10,10 @@ Bluetooth, Location and Notification permissions are all necessary otherwise the
 
 Before connecting the camera, users should complete the Bluetooth pairing between the phone and the camera in the system interface.
 
+## Faith speed mode
+
+If this switch is turned on, the App will try to use some methods to speed up the connection with the camera, but it may lead to more compatibility issues.
+
 ## Compatibility
 
 The minimum Android version requirement is 13.
@@ -18,7 +22,7 @@ Currently only tested on my Xiaomi phone (Android 13) and Sony A7CR and expected
 
 ## Known issues
 
-Sometimes the connection symbol appears on the camera, but the positioning symbol does not appear on the camera for a long time. When this happens, you can try to turn the camera back off and on, if it doesn't work, the next thing to try is to exit and re-enter the software, or even turn off the Bluetooth switch and re-open to clear the cache that may be behind.
+In very few cases, the connection symbol appears on the camera, but the positioning symbol does not appear on the camera for a long time (more than 10 seconds). When this happens, you can try to turn the camera back off and on, if it doesn't work, the next thing to try is to exit and re-enter the software, or even turn off the Bluetooth switch and re-open to clear the cache that may be behind.
 
 In order to reduce power consumption, sometimes the Android system will go into hibernation, and the positioning symbol on the camera will disappear, at this time, press the power button to activate it.
 

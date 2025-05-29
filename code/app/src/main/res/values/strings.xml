@@ -1,6 +1,5 @@
 <resources>
     <string name="app_name">Sony Camera Location</string>
-    <string name="app_version" translatable="false">v1.22</string>
     <string name="service_notify">Keep this notification to hold running</string>
     <string name="channel_id" translatable="false">top.m24h.sonycamloc</string>
     <string name="channel_name" translatable="false">Sony Camera Location</string>
@@ -17,6 +16,7 @@
     <string name="ble_need_pair">You need to pair it on system setting</string>
     <string name="ble_need_enable">Is bluetooth enabled?</string>
     <string name="loc_enable">Enable Location?</string>
+    <string name="faith_mode">Faith Speed?</string>
     <string name="focus">Focus</string>
     <string name="shot">Shot</string>
     <string name="zoom_t">Tele</string>

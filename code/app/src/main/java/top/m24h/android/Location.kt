@@ -3,7 +3,7 @@ package top.m24h.android
 import android.Manifest
 import android.content.Context
 import android.content.Context.LOCATION_SERVICE
-import android.location.Location
+import android.location.Location as AndroidLocation
 import android.location.LocationListener
 import android.location.LocationManager
 import androidx.annotation.RequiresPermission
@@ -11,7 +11,19 @@ import androidx.annotation.RequiresPermission
 /**
  * a simple location implement
  */
-open class Location (val context : Context) : LocationListener{
+class Location (val context : Context, val updater:((AndroidLocation)->Unit)?=null) : LocationListener {
+    companion object {
+        fun convertDMS(inp: Double?, positiveStr: String, negativeStr: String): String? {
+            if (inp==null) return null
+            if (inp<0) return convertDMS(-inp, negativeStr, negativeStr)
+            var d=inp.toInt()
+            var s=(inp-d)*60
+            var m=s.toInt()
+            s=(s-m)*60
+            return "%d°%d'%.2f\"%s".format(d, m, s, positiveStr)
+        }
+    }
+
     var longitude: Double? = null
     var latitude: Double? = null
     var started = false
@@ -21,9 +33,10 @@ open class Location (val context : Context) : LocationListener{
     /**
      * called when location is updated
      */
-    override fun onLocationChanged(location: Location) {
+    override fun onLocationChanged(location: AndroidLocation) {
         longitude = location.longitude
         latitude = location.latitude
+        updater?.invoke(location)
     }
 
     /**
