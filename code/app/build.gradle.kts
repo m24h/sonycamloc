@@ -14,8 +14,8 @@ android {
         applicationId = "top.m24h.sonycamloc"
         minSdk = 33
         targetSdk = 33
-        versionCode = 9
-        versionName = "1.23"
+        versionCode = 10
+        versionName = "1.24"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -40,6 +40,7 @@ android {
     buildFeatures {
         dataBinding = true
     }
+    buildToolsVersion = "35.0.0"
 }
 
 dependencies {

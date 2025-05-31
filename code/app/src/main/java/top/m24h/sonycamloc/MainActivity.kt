@@ -89,7 +89,7 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
             Manifest.permission.POST_NOTIFICATIONS)
             .filter { ContextCompat.checkSelfPermission(this, it)!=PackageManager.PERMISSION_GRANTED }
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { map ->
-            val remain = need.filter { it !in map || !map[it]!! }
+            val remain = need.filter { it !in map || map[it]!=true }
             if (remain.isNotEmpty()) {
                 Log.e("MainActivity.checkPermissionsAndStartService",
                     "missing permissions: " + remain.joinToString(","))
@@ -157,12 +157,12 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
         activityResultRegistry.register(
             System.currentTimeMillis().toString(),
             ActivityResultContracts.StartActivityForResult()
-        ) { result ->
-            if (result != null && result.resultCode == RESULT_OK && result.data != null) {
-                // set cameraName first, it's not observed as a trigger
-                cameraName.set(result.data!!.getStringExtra("name"))
-                cameraMAC.set(result.data!!.getStringExtra("mac"))
-            }
+        ) {
+            it?.takeIf { it.resultCode == RESULT_OK }
+                ?.data ?.let {
+                    cameraName.set(it.getStringExtra("name"))
+                    cameraMAC.set(it.getStringExtra("mac"))
+                }
         }.launch(Intent(this, ScanActivity::class.java))
     }
     private fun sendRemote(remote:ByteArray) {

@@ -36,10 +36,6 @@ fun setDownUpListener(view: View, action: (isDown: Boolean) -> Unit) {
     }
 }
 
-fun debug(s:String, title:String?=null) {
-//    Log.d(title?:"debug", s)
-}
-
 
 
 

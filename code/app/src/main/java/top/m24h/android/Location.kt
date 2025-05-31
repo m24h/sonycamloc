@@ -6,12 +6,14 @@ import android.content.Context.LOCATION_SERVICE
 import android.location.Location as AndroidLocation
 import android.location.LocationListener
 import android.location.LocationManager
+import android.os.Looper
 import androidx.annotation.RequiresPermission
+import kotlinx.coroutines.delay
 
 /**
  * a simple location implement
  */
-class Location (val context : Context, val updater:((AndroidLocation)->Unit)?=null) : LocationListener {
+class Location (val context : Context, val updater:((Location)->Unit)?=null) : LocationListener {
     companion object {
         fun convertDMS(inp: Double?, positiveStr: String, negativeStr: String): String? {
             if (inp==null) return null
@@ -24,19 +26,17 @@ class Location (val context : Context, val updater:((AndroidLocation)->Unit)?=nu
         }
     }
 
-    var longitude: Double? = null
-    var latitude: Double? = null
-    var started = false
+    var location: AndroidLocation? = null
 
+    private var started = false
     private var manager : LocationManager? = null
 
     /**
      * called when location is updated
      */
     override fun onLocationChanged(location: AndroidLocation) {
-        longitude = location.longitude
-        latitude = location.latitude
-        updater?.invoke(location)
+        this.location=location
+        updater?.invoke(this)
     }
 
     /**
@@ -53,8 +53,7 @@ class Location (val context : Context, val updater:((AndroidLocation)->Unit)?=nu
             started=false
             manager?.removeUpdates(this)
         } catch (_: Exception) {}
-        longitude = null
-        latitude = null
+        location = null
     }
 
     /**
@@ -62,19 +61,30 @@ class Location (val context : Context, val updater:((AndroidLocation)->Unit)?=nu
      */
     @Suppress("unused")
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION,
-                                 Manifest.permission.ACCESS_COARSE_LOCATION])
-    fun start(interval:Long, distance:Float) : Boolean {
+        Manifest.permission.ACCESS_COARSE_LOCATION])
+    fun start(interval:Long, distance:Float, looper:Looper?) : Boolean {
         stop()
         manager = manager ?: (context.getSystemService(LOCATION_SERVICE) as LocationManager?)
-        manager ?.run { if (isProviderEnabled(LocationManager.FUSED_PROVIDER) == true)
-                            LocationManager.FUSED_PROVIDER
-                        else if (isProviderEnabled(LocationManager.GPS_PROVIDER) == true)
-                            LocationManager.GPS_PROVIDER
-                        else null }
-                    ?.let {
-                        manager!!.requestLocationUpdates(it, interval, distance, this)
-                        started=true
-                    }
+        manager ?.run {
+            (if (isProviderEnabled(LocationManager.FUSED_PROVIDER) == true)
+                LocationManager.FUSED_PROVIDER
+            else if (isProviderEnabled(LocationManager.GPS_PROVIDER) == true)
+                LocationManager.GPS_PROVIDER
+            else null)
+                ?.let {
+                    requestLocationUpdates(it, interval, distance, this@Location, looper)
+                    started = true
+                }
+        }
         return (started)
+    }
+
+    /**
+     * wait for non-null .location
+     */
+    @Suppress("unused")
+    suspend fun waitForLocationData(timeoutMs:Long, checkInterval: Long=100L) {
+        var timeLeft = (timeoutMs+checkInterval/2)/checkInterval
+        while (location==null && timeLeft>0) delay(checkInterval)
     }
 }
