@@ -36,6 +36,7 @@ import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.actor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
@@ -216,26 +217,32 @@ class MainService : Service() {
                         BluetoothDevice.TRANSPORT_AUTO, BluetoothDevice.PHY_LE_1M_MASK,
                         Handler(mainLooper))  // uses main thread for volatile data
             }
-        // initialize camera after connected
-        if (gattConnected && locEnable && characteristicGpsData!=null && !cameraInitialized) {
-            cameraInitialized =
-                    characteristicGps30?.let{gattWrite(it, SonyCam.GPS_ENABLE)==true}!=false
-                 && characteristicGps31?.let{gattWrite(it, SonyCam.GPS_ENABLE)==true}!=false
-                 && characteristicGpsTime?.let{gattWrite(it, SonyCam.GPS_ENABLE)==true}!=false
-                 && characteristicGpsZone?.let{gattWrite(it, SonyCam.GPS_DISABLE)==true}!=false
-        }
-        // check if location is needed to start
-        if (gattConnected && locEnable) {
-            if (!location.isStarted()) {
-                if (location.start((resources.getInteger(R.integer.interval_location)).toLong() * 1000L, 0.0f, mainLooper)) {
-                    if (!wakeLock.isHeld) wakeLock.acquire(resources.getInteger(R.integer.wakelock_time).toLong() * 1000L)
-                    location.waitForLocationData(5000L)
+        joinAll(
+            mainScope.launch {
+                // initialize camera after connected
+                if (gattConnected && locEnable && characteristicGpsData!=null && !cameraInitialized) {
+                    cameraInitialized =
+                        characteristicGps30?.let{gattWrite(it, SonyCam.GPS_ENABLE)==true}!=false
+                                && characteristicGps31?.let{gattWrite(it, SonyCam.GPS_ENABLE)==true}!=false
+                                && characteristicGpsTime?.let{gattWrite(it, SonyCam.GPS_ENABLE)==true}!=false
+                                && characteristicGpsZone?.let{gattWrite(it, SonyCam.GPS_DISABLE)==true}!=false
+                }
+            },
+            mainScope.launch {
+                // check if location is needed to start
+                if (gattConnected && locEnable) {
+                    if (!location.isStarted()) {
+                        if (location.start((resources.getInteger(R.integer.interval_location)).toLong() * 1000L, 0.0f, mainLooper)) {
+                            if (!wakeLock.isHeld) wakeLock.acquire(resources.getInteger(R.integer.wakelock_time).toLong() * 1000L)
+                            location.waitForLocationData(5000L)
+                        }
+                    }
+                } else  {
+                    if (wakeLock.isHeld) wakeLock.release()
+                    if (location.isStarted()) location.stop()
                 }
             }
-        } else  {
-            if (wakeLock.isHeld) wakeLock.release()
-            if (location.isStarted()) location.stop()
-        }
+        )
         // send GPS data to camera
         val loc = location.location // a copy to avoid volatile data
         if (gattConnected && locEnable && cameraInitialized && loc!=null) {
@@ -295,7 +302,7 @@ class MainService : Service() {
             // The Android underlay also does the discovery.
             // so ignore it
             /*
-            if (faithMode && gattConnected) { // only after connected
+            if (!faithMode && gattConnected) { // only after connected
                 gattConnected = false
                 gatt.discoverServices()
             }
@@ -317,7 +324,6 @@ class MainService : Service() {
                 activeLoop()
             } else { // try to re-connect
                 gatt.disconnect()
-                gatt.connect()
             }
         }
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
@@ -339,7 +345,7 @@ class MainService : Service() {
             } else {
                 gattReset(false)
                 activeLoop()
-                //gatt.javaClass.getMethod("refresh")?.invoke(gatt)
+                gatt.connect() // keep connecting for active/passive disconnecting
             }
         }
     }
@@ -370,10 +376,9 @@ class MainService : Service() {
             suspendCancellableCoroutine<Boolean> { cont ->
                 cont.invokeOnCancellation {
                     gattStatus=null
-                    Log.e("MainService.gattWrite", "timeout, try to reconnect")
-                    // this will break discovery progress in backend for faith mode, and speed up the response
+                    Log.e("MainService.gattWrite", "timeout when writing ${characteristic.uuid}, try to reconnect")
+                    // maybe there's a services discovery progress in backend, break it by disconnecting
                     gatt?.disconnect()
-                    gatt?.connect()
                 }
                 gattStatus=cont
                 if (gatt?.writeCharacteristic(characteristic, bytes, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)

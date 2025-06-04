@@ -3,7 +3,6 @@ import com.android.build.gradle.internal.scope.publishBuildArtifacts
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    id ("maven-publish")
 }
 
 android {
@@ -14,8 +13,8 @@ android {
         applicationId = "top.m24h.sonycamloc"
         minSdk = 33
         targetSdk = 33
-        versionCode = 10
-        versionName = "1.24"
+        versionCode = 11
+        versionName = "1.25"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
