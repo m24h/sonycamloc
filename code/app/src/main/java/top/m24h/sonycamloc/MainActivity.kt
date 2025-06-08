@@ -24,8 +24,8 @@ import top.m24h.sonycamloc.databinding.ActivityMainBinding
 
 class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
     lateinit var versionName :String
-    // data maintained by others
-    val connected = ObservableBoolean(false)
+    // data maintained by service
+    val ready = ObservableBoolean(false)
     val canRemote = ObservableBoolean(false)
     val longitude = ObservableField<String>()
     val latitude = ObservableField<String>()
@@ -65,8 +65,8 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
     private val broadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == MainService.broadcastAction) {
-                if (intent.hasExtra("connected"))
-                    connected.set(intent.getBooleanExtra("connected", false))
+                if (intent.hasExtra("ready"))
+                    ready.set(intent.getBooleanExtra("ready", false))
                 if (intent.hasExtra("canRemote"))
                     canRemote.set(intent.getBooleanExtra("canRemote", false))
                 if (intent.hasExtra("longitude"))

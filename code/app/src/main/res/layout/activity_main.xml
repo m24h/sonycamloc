@@ -21,7 +21,7 @@
             android:layout_marginTop="10dp"
             android:alpha="@{(model.cameraName!=null || model.cameraMAC!=null) ? 1.0f:0.5f}"
             android:drawablePadding="10dp"
-            android:enabled="@{model.connected}"
+            android:enabled="@{model.ready}"
             android:text="@{model.cameraName ?? model.cameraMAC ?? @string/camera_not_set}"
             app:drawableLeftCompat="@drawable/camera_48"
             app:drawableTint="@color/primary"
@@ -162,7 +162,7 @@
                     android:layout_weight="1"
                     android:baselineAligned="false"
                     android:drawableLeft="@drawable/zoomw_48"
-                    android:enabled="@{model.connected &amp;&amp; model.cameraName!=null &amp;&amp; model.canRemote}"
+                    android:enabled="@{model.ready &amp;&amp; model.cameraName!=null &amp;&amp; model.canRemote}"
                     android:text="@string/zoom_w" />
 
                 <Button
@@ -175,7 +175,7 @@
                     android:autoSizeTextType="none"
                     android:baselineAligned="false"
                     android:drawableLeft="@drawable/zoomt_48"
-                    android:enabled="@{model.connected &amp;&amp; model.cameraName!=null &amp;&amp; model.canRemote}"
+                    android:enabled="@{model.ready &amp;&amp; model.cameraName!=null &amp;&amp; model.canRemote}"
                     android:text="@string/zoom_t" />
             </TableRow>
 
@@ -192,7 +192,7 @@
                     android:layout_weight="1"
                     android:baselineAligned="false"
                     android:drawableLeft="@drawable/shot_48"
-                    android:enabled="@{model.connected &amp;&amp; model.cameraName!=null &amp;&amp; model.canRemote}"
+                    android:enabled="@{model.ready &amp;&amp; model.cameraName!=null &amp;&amp; model.canRemote}"
                     android:text="@string/shot" />
 
                 <Button
@@ -204,7 +204,7 @@
                     android:layout_weight="1"
                     android:baselineAligned="false"
                     android:drawableLeft="@drawable/focus_48"
-                    android:enabled="@{model.connected &amp;&amp; model.cameraName!=null &amp;&amp; model.canRemote}"
+                    android:enabled="@{model.ready &amp;&amp; model.cameraName!=null &amp;&amp; model.canRemote}"
                     android:text="@string/focus" />
             </TableRow>
         </TableLayout>

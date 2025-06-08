@@ -1,6 +1,6 @@
 # Sony Camera Location Tool
 
-An android App for location and remote control on Sony camera.
+An android App for location and remote control on Sony camera. This App tries to make the best possible speed of location and the stability of the connection to camera.
 
 ## Permission requirements
 
@@ -26,7 +26,9 @@ In very few cases, the connection symbol appears on the camera, but the position
 
 In order to reduce power consumption, sometimes the Android system will go into hibernation, and the positioning symbol on the camera will disappear, at this time, press the power button to activate it.
 
-Sometimes there will be positioning deviations, but the positioning accuracy comes from the Android phone itself. This App cannot identify the  deviations and avoid this problem, and can only use the underlying submitted data. And in order to reduce power consumption, it will not locate when the camera is not connected, so the underlying data will have a certain inertia. If you have just arrived in a new place far from last place, it is recommended to wait for about 20 seconds for the new positioning data to stabilize.
+Sometimes there will be positioning deviations, but the positioning accuracy comes from the Android phone itself. This App cannot identify the  deviations and avoid this problem, and can only use the underlying data. And in order to reduce power consumption, it will not locate when the camera is not connected, so the underlying data will have a certain inertia. If you have just arrived in a new place far from last place, it is recommended to wait for about 20 seconds for the new positioning data to stabilize.
+
+In addition, if you open some well-known map software, the system will most likely use their commercial-grade positioning assistance, which will improve the positioning accuracy.
 
 ## Looks like
 
