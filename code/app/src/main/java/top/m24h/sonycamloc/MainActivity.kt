@@ -142,7 +142,6 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
                     ActivityResultContracts.StartActivityForResult()
                 ) { _-> }.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
             }
-        //
     }
     override fun onDestroy() {
         unregisterReceiver(broadcastReceiver)

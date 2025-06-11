@@ -12,7 +12,7 @@ Before connecting the camera, users should complete the Bluetooth pairing betwee
 
 ## Faith speed mode
 
-If this switch is turned on, the App will try to use some methods to speed up the connection with the camera, but it may lead to more compatibility issues.
+If this switch is turned on, the App will try to use some methods to speed up the connection with the camera, but it may lead to more compatibility issues. At the moment, it's only tweaked for my A7CR and an Android 13 phone, which may not work well and may even slow things down.
 
 ## Compatibility
 

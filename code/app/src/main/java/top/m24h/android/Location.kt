@@ -3,12 +3,16 @@ package top.m24h.android
 import android.Manifest
 import android.content.Context
 import android.content.Context.LOCATION_SERVICE
-import android.location.Location as AndroidLocation
 import android.location.LocationListener
 import android.location.LocationManager
-import android.os.Looper
+import android.location.LocationRequest
+import android.os.Handler
+import android.util.Log
 import androidx.annotation.RequiresPermission
 import kotlinx.coroutines.delay
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
+import android.location.Location as AndroidLocation
 
 /**
  * a simple location implement
@@ -27,64 +31,102 @@ class Location (val context : Context, val updater:((Location)->Unit)?=null) : L
     }
 
     var location: AndroidLocation? = null
-
-    private var started = false
-    private var manager : LocationManager? = null
+    var updateTime:Long? = null
 
     /**
      * called when location is updated
      */
-    override fun onLocationChanged(location: AndroidLocation) {
-        this.location=location
+    override fun onLocationChanged(loc: AndroidLocation) {
+        location=loc
+        updateTime=System.currentTimeMillis()
         updater?.invoke(this)
     }
 
     /**
      * is started?
      */
+    private var started = false
     fun isStarted() =started
+
+    var manager: LocationManager?=null
+    var handler: Handler? =null
 
     /**
      * stop locating
      */
     @Suppress("unused")
     fun stop() {
-        if (started)  try {
-            started=false
-            manager?.removeUpdates(this)
-        } catch (_: Exception) {}
+        handler?.removeCallbacksAndMessages(null)
+        if (started)  try { manager?.removeUpdates(this) } catch (_: Exception) {}
+        started=false
         location = null
+        updateTime = null
     }
 
     /**
      * start locating
+     * If it `timeout` (more than `interval`+`timeout` since last `this.updateTime`) and does not get location, it will be restarted automatically,
      */
     @Suppress("unused")
-    @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION,
-        Manifest.permission.ACCESS_COARSE_LOCATION])
-    fun start(interval:Long, distance:Float, looper:Looper?) : Boolean {
+    fun start(interval:Long, timeout:Long, distance:Float=0.0f) : Boolean {
         stop()
-        manager = manager ?: (context.getSystemService(LOCATION_SERVICE) as LocationManager?)
-        manager ?.run {
-            (if (isProviderEnabled(LocationManager.FUSED_PROVIDER) == true)
-                LocationManager.FUSED_PROVIDER
-            else if (isProviderEnabled(LocationManager.GPS_PROVIDER) == true)
-                LocationManager.GPS_PROVIDER
-            else null)
-                ?.let {
-                    requestLocationUpdates(it, interval, distance, this@Location, looper)
-                    started = true
+        manager = manager ?: context.getSystemService(LOCATION_SERVICE) as LocationManager?
+        handler = handler ?: Handler(context.mainLooper)
+        val request=LocationRequest.Builder(interval)
+            .setMinUpdateDistanceMeters(distance)
+            .setMinUpdateIntervalMillis(interval)
+            .setQuality(LocationRequest.QUALITY_HIGH_ACCURACY)
+            .build()
+        updateTime = null
+        started=handler?.post(object : Runnable {
+            @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION])
+            override fun run() {
+                if (System.currentTimeMillis() - (updateTime?:0) >interval+timeout) try {
+                    manager?.run {
+                        (if (isProviderEnabled(LocationManager.FUSED_PROVIDER)) LocationManager.FUSED_PROVIDER
+                        else if (isProviderEnabled(LocationManager.GPS_PROVIDER)) LocationManager.GPS_PROVIDER
+                        else null) ?.let {
+                            try { removeUpdates(this@Location) } catch (e: Exception) {}
+                            requestLocationUpdates(it, request, context.mainExecutor, this@Location)
+                        }
+                    }
+                } catch (e:Exception) {
+                    Log.e("Location.start","failed to start location", e)
                 }
-        }
+                if (started) handler?.postDelayed(this, interval)
+            }}) == true
         return (started)
     }
 
     /**
-     * wait for non-null .location
+     * wait for non-null location
      */
     @Suppress("unused")
     suspend fun waitForLocationData(timeoutMs:Long, checkInterval: Long=100L) {
         var timeLeft = (timeoutMs+checkInterval/2)/checkInterval
-        while (location==null && timeLeft>0) delay(checkInterval)
+        while (location==null && timeLeft-->0) delay(checkInterval)
+    }
+
+    @Suppress("unused")
+    @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION,
+        Manifest.permission.ACCESS_COARSE_LOCATION])
+    suspend fun getCurrent(interval:Long, timeout:Long) : AndroidLocation? = suspendCoroutine { cont ->
+        manager = manager ?: (context.getSystemService(LOCATION_SERVICE) as LocationManager?)
+        manager ?.run {
+            (if (isProviderEnabled(LocationManager.FUSED_PROVIDER))
+                LocationManager.FUSED_PROVIDER
+            else if (isProviderEnabled(LocationManager.GPS_PROVIDER))
+                LocationManager.GPS_PROVIDER
+            else null)
+                ?.let {
+                    getCurrentLocation(it,
+                        LocationRequest.Builder(interval)
+                            .setQuality(LocationRequest.QUALITY_HIGH_ACCURACY)
+                            .setDurationMillis(timeout)
+                            .build(),
+                        null, context.mainExecutor) { cont.resume(it) }
+                }
+        }
     }
 }

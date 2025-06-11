@@ -10,7 +10,7 @@ import android.bluetooth.BluetoothProfile
 import android.bluetooth.BluetoothStatusCodes
 import android.content.Context
 import android.os.Handler
-import android.util.Log
+import android.os.Looper
 import androidx.annotation.RequiresPermission
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.delay
@@ -18,7 +18,9 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
-class BLE private constructor(val onService:(()->Unit)?,
+class BLE private constructor(val handler:Handler,
+                              val autoConnect: Boolean,
+                              val onService:(()->Unit)?,
                               val onCharacteristic:((BluetoothGattCharacteristic, ByteArray)->Unit)?,
                               val onConnect:((Boolean)->Unit)?)
 : BluetoothGattCallback(), AutoCloseable {
@@ -26,13 +28,15 @@ class BLE private constructor(val onService:(()->Unit)?,
         // open a GATT object
         @Suppress("unused")
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-        fun open (context:Context, device:BluetoothDevice, autoConnect:Boolean=true, handler:Handler?=null,
+        fun open (context:Context, device:BluetoothDevice, autoConnect:Boolean=true, looper:Looper?=null,
                   onService:(()->Unit)? =null,
                   onCharacteristic:((BluetoothGattCharacteristic, ByteArray)->Unit)? =null,
                   onConnect:((Boolean)->Unit)?=null) : BLE? {
-            val ble=BLE(onService, onCharacteristic, onConnect)
+            val ble=BLE(Handler(looper?:context.mainLooper), autoConnect,
+                        onService, onCharacteristic, onConnect)
             return device.connectGatt(context, autoConnect, ble,
-                       BluetoothDevice.TRANSPORT_AUTO, BluetoothDevice.PHY_LE_1M_MASK, handler)
+                       BluetoothDevice.TRANSPORT_AUTO, BluetoothDevice.PHY_LE_1M_MASK,
+                       ble.handler)
                 ?.let { ble.apply {gatt=it} }
         }
     }
@@ -91,11 +95,13 @@ class BLE private constructor(val onService:(()->Unit)?,
         onService?.invoke()
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
         super.onConnectionStateChange(gatt, status, newState)
         result=null
         isConnected = newState==BluetoothProfile.STATE_CONNECTED
         onConnect?.invoke(isConnected)
+        if (autoConnect && !isConnected) connect()
     }
 
     /**
@@ -106,6 +112,7 @@ class BLE private constructor(val onService:(()->Unit)?,
         result=null
         isConnected=false
         try { gatt.close() } catch (_:Exception) {}
+        handler.removeCallbacksAndMessages(null)
     }
 
     /**
@@ -128,9 +135,7 @@ class BLE private constructor(val onService:(()->Unit)?,
         = withTimeoutOrNull (timeout) {
             while (result!=null) delay(100)
             suspendCancellableCoroutine<Any?> {
-                it.invokeOnCancellation {
-                    result=null
-                }
+                it.invokeOnCancellation { result=null }
                 result=it
                 if (action()!=true) {
                     it.resume(null)
@@ -143,7 +148,7 @@ class BLE private constructor(val onService:(()->Unit)?,
      * read from characteristic
      * return null when timeout or not connected or starting failure, or (BluetoothGatt.GATT_XXX, ByteArray)
      */
-    @Suppress("unused")
+    @Suppress("UNCHECKED_CAST", "unused")
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     suspend fun read(characteristic: BluetoothGattCharacteristic, timeout:Long) : Pair<Int, ByteArray>?
         = wait (timeout) { gatt.takeIf{isConnected}?.readCharacteristic(characteristic) } as? Pair<Int, ByteArray>
@@ -160,7 +165,7 @@ class BLE private constructor(val onService:(()->Unit)?,
      * read from Descriptor
      * return null when timeout or not connected or starting failure, or (BluetoothGatt.GATT_XXX, ByteArray)
      */
-    @Suppress("unused")
+    @Suppress("UNCHECKED_CAST", "unused")
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     suspend fun read(descriptor: BluetoothGattDescriptor, timeout:Long) : Pair<Int, ByteArray>?
             = wait (timeout) { gatt.takeIf{isConnected}?.readDescriptor(descriptor) } as? Pair<Int, ByteArray>
@@ -176,7 +181,7 @@ class BLE private constructor(val onService:(()->Unit)?,
      * request MTU size
      * return null when timeout or not connected or starting failure, or (BluetoothGatt.GATT_XXX, Int)
      */
-    @Suppress("unused")
+    @Suppress("UNCHECKED_CAST", "unused")
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     suspend fun requestMtu(mtu:Int, timeout:Long) : Pair<Int, Int>?
         = wait (timeout) { gatt.takeIf{isConnected}?.requestMtu(mtu)} as? Pair<Int, Int>

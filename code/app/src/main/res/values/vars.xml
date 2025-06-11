@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <integer name="interval_location">10</integer>
+    <integer name="timeout_location">10</integer>
     <integer name="interval_ticker">300</integer>
     <integer name="wakelock_time">1200</integer>
 </resources>
