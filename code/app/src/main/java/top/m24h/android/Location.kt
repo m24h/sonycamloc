@@ -17,6 +17,7 @@ import android.location.Location as AndroidLocation
 /**
  * a simple location implement
  */
+@Suppress("unused")
 class Location (val context : Context, val updater:((Location)->Unit)?=null) : LocationListener {
     companion object {
         fun convertDMS(inp: Double?, positiveStr: String, negativeStr: String): String? {
@@ -46,7 +47,8 @@ class Location (val context : Context, val updater:((Location)->Unit)?=null) : L
      * is started?
      */
     private var started = false
-    fun isStarted() =started
+    val isStarted
+        get() =started
 
     var manager: LocationManager?=null
     var handler: Handler? =null
@@ -54,7 +56,6 @@ class Location (val context : Context, val updater:((Location)->Unit)?=null) : L
     /**
      * stop locating
      */
-    @Suppress("unused")
     fun stop() {
         handler?.removeCallbacksAndMessages(null)
         if (started)  try { manager?.removeUpdates(this) } catch (_: Exception) {}
@@ -67,7 +68,6 @@ class Location (val context : Context, val updater:((Location)->Unit)?=null) : L
      * start locating
      * If it `timeout` (more than `interval`+`timeout` since last `this.updateTime`) and does not get location, it will be restarted automatically,
      */
-    @Suppress("unused")
     fun start(interval:Long, timeout:Long, distance:Float=0.0f) : Boolean {
         stop()
         manager = manager ?: context.getSystemService(LOCATION_SERVICE) as LocationManager?
@@ -102,13 +102,14 @@ class Location (val context : Context, val updater:((Location)->Unit)?=null) : L
     /**
      * wait for non-null location
      */
-    @Suppress("unused")
     suspend fun waitForLocationData(timeoutMs:Long, checkInterval: Long=100L) {
         var timeLeft = (timeoutMs+checkInterval/2)/checkInterval
         while (location==null && timeLeft-->0) delay(checkInterval)
     }
 
-    @Suppress("unused")
+    /**
+     * get current location
+     */
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION,
         Manifest.permission.ACCESS_COARSE_LOCATION])
     suspend fun getCurrent(interval:Long, timeout:Long) : AndroidLocation? = suspendCoroutine { cont ->

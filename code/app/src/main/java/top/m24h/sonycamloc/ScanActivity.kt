@@ -33,8 +33,8 @@ class ScanActivity : AppActivity<ActivityScanBinding>(R.layout.activity_scan)
             sortedSetOf<ScanResult>( object : Comparator<ScanResult> {
                 @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
                 override fun compare(p0: ScanResult?, p1: ScanResult?): Int {
-                    return ((if (SonyCam.isSonyCam(p0?.scanRecord?.manufacturerSpecificData)) "A" else "B")+(p0?.device?.name?:""))
-                        .compareTo((if (SonyCam.isSonyCam(p1?.scanRecord?.manufacturerSpecificData)) "A" else "B")+(p1?.device?.name?:""))
+                    return ((if (Camera.type(p0?.scanRecord?.manufacturerSpecificData)!=null) "A" else "B")+(p0?.device?.name?:""))
+                        .compareTo((if (Camera.type(p1?.scanRecord?.manufacturerSpecificData)!=null) "A" else "B")+(p1?.device?.name?:""))
                 }
             })
         )
@@ -52,22 +52,30 @@ class ScanActivity : AppActivity<ActivityScanBinding>(R.layout.activity_scan)
         super.onDestroy()
     }
     // button onClick
+    fun onBlank() {
+        setResult(RESULT_OK, Intent()
+            .putExtra("mac", null as String?)
+            .putExtra("name", null as String?)
+            .putExtra("type", null as String?)
+            .putExtra("class", null as String?)
+        )
+        finish()
+    }
     fun onBack() {
-        this.setResult(RESULT_CANCELED)
+        setResult(RESULT_CANCELED)
         finish()
     }
     // process scanned devices
     val scanCallback = object: ScanCallback() {
-        var lastFlushTime=0L
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
             super.onScanResult(callbackType, result)
-            val now=System.currentTimeMillis()
             if (result?.device?.name?.isNotEmpty()==true && result.device?.address?.isNotEmpty()==true) {
-                listViewAdapter.data.add(result)
-                if (now-lastFlushTime>999) {
-                    lastFlushTime=now
-                    listViewAdapter.notifyDataSetChanged()
+                runOnUiThread {
+                    val count=listViewAdapter.data.count()
+                    listViewAdapter.data.add(result)
+                    if (count!=listViewAdapter.data.count())
+                        listViewAdapter.notifyDataSetChanged()
                 }
             }
         }
@@ -79,13 +87,19 @@ class ScanActivity : AppActivity<ActivityScanBinding>(R.layout.activity_scan)
         if (!binding.deviceList.isEnabled)  return
         binding.deviceList.isEnabled = false
         val scanResult=listViewAdapter.data.elementAt(pos)
-        if (scanResult.device.bondState != BluetoothDevice.BOND_BONDED) {
+        val type=Camera.type(scanResult.scanRecord?.manufacturerSpecificData)
+        if (type==null) {
+            Toast.makeText(this, R.string.ble_unknown_device, Toast.LENGTH_LONG).show()
+            binding.deviceList.isEnabled = true
+        } else if (type.needBind && scanResult.device.bondState!=BluetoothDevice.BOND_BONDED) {
             Toast.makeText(this, R.string.ble_need_pair, Toast.LENGTH_LONG).show()
             binding.deviceList.isEnabled = true
         } else {
             setResult(RESULT_OK, Intent()
                 .putExtra("mac", scanResult.device.address)
                 .putExtra("name", scanResult.device.name)
+                .putExtra("type", type.name)
+                .putExtra("class", type.cameraClass().name)
             )
             finish()
         }

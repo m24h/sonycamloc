@@ -1,22 +1,26 @@
 <resources>
-    <string name="app_name">Sony Camera Location</string>
+    <string name="app_name">Camera Geo</string>
     <string name="service_notify">Keep this notification to hold running</string>
     <string name="channel_id" translatable="false">top.m24h.sonycamloc</string>
-    <string name="channel_name" translatable="false">Sony Camera Location</string>
-    <string name="channel_description" translatable="false">app notifications</string>
+    <string name="channel_name" translatable="false">Camera GeoTag</string>
+    <string name="channel_description" translatable="false">Service notifications</string>
     <string name="longitude">Lng:</string>
     <string name="latitude">Lat:</string>
+    <string name="altitude">Alt:</string>
     <string name="exit">Terminate</string>
     <string name="scan">Scan</string>
+    <string name="scan_blank">Blank</string>
+    <string name="scan_exist">This device has already been added</string>
     <string name="permission_need">Need Permissions</string>
     <string name="permission_need_msg">To work, Location and Bluetooth permissions are essential. Please manually enable these permissions required by the app, especially for the permission like "location: allow all the time".</string>
     <string name="dlg_ok">OK</string>
     <string name="dlg_cancel">Cancel</string>
     <string name="camera_not_set">Scan for a camera</string>
+    <string name="ble_unknown_device">This device is not currently supported</string>
     <string name="ble_need_pair">You need to pair it on system setting</string>
     <string name="ble_need_enable">Is bluetooth enabled?</string>
     <string name="loc_enable">Enable Location?</string>
-    <string name="faith_mode">Faith Speed?</string>
+    <string name="faith_mode">Faith Mode</string>
     <string name="focus">Focus</string>
     <string name="shot">Shot</string>
     <string name="zoom_t">Tele</string>

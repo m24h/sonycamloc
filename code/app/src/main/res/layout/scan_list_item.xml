@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools">
     <data>
-        <import type="top.m24h.sonycamloc.SonyCam" />
+        <import type="top.m24h.sonycamloc.Camera" />
         <import type="android.bluetooth.BluetoothDevice" />
         <variable name="item" type="android.bluetooth.le.ScanResult" />
     </data>
@@ -20,7 +20,7 @@
             android:layout_marginEnd="10dp"
             android:layout_weight="0"
             android:alpha="@{(item.device.bondState==BluetoothDevice.BOND_BONDED)?1.0f:0.5f}"
-            android:foreground="@{SonyCam.isSonyCam(item.scanRecord.manufacturerSpecificData)?@drawable/camera_48:@drawable/bluetooth_48}"
+            android:foreground="@{(Camera.type(item.scanRecord.manufacturerSpecificData)!=null)?@drawable/camera_48:@drawable/bluetooth_48}"
         />
 
         <LinearLayout

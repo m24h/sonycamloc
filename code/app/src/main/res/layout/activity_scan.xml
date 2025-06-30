@@ -29,13 +29,24 @@
             app:layout_constraintVertical_bias="0.0" />
 
         <Button
+            android:id="@+id/btnRemove"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginRight="20dp"
+            android:layout_marginBottom="10dp"
+            android:onClick="@{()->model.onBlank()}"
+            android:text="@string/scan_blank"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintRight_toLeftOf="@id/btnBack" />
+
+        <Button
             android:id="@+id/btnBack"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="10dp"
             android:text="@string/dlg_cancel"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
             android:onClick="@{()->model.onBack()}" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 </layout>

@@ -11,6 +11,7 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -20,64 +21,98 @@ import androidx.databinding.Observable
 import androidx.databinding.Observable.OnPropertyChangedCallback
 import androidx.databinding.ObservableBoolean
 import androidx.databinding.ObservableField
+import androidx.databinding.ObservableInt
 import top.m24h.sonycamloc.databinding.ActivityMainBinding
 
+private const val CAMERA_SLOTS = 3
+
 class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
-    lateinit var versionName :String
-    // data maintained by service
-    val ready = ObservableBoolean(false)
-    val canRemote = ObservableBoolean(false)
+    val versionName :String by lazy {
+        packageManager.getPackageInfo(packageName, 0).versionName?:""
+    }
+    // cameras
+    class CameraInfo {
+        // maintained by service
+        val ready = ObservableBoolean(false)
+        val remoteFeatures = ObservableField<String>()
+        // maintained by this
+        val mac = ObservableField<String>()
+        val name = ObservableField<String>()
+        val type = ObservableField<String>()
+        val clazz = ObservableField<String>()
+    }
+    val cameras = List(3) { CameraInfo() }
+    // other data maintained by service
     val longitude = ObservableField<String>()
     val latitude = ObservableField<String>()
+    val altitude = ObservableField<String>()
     val lastSyncTime = ObservableField<String>()
-    // data maintained by me
-    val cameraMAC = ObservableField<String>()
-    val cameraName = ObservableField<String>()
+    // other data maintained by this
     val locEnable = ObservableBoolean(false)
-    val faithMode = ObservableBoolean(false)
+    var faithMode = ObservableInt(1)
+
     // maintain settings
     private fun loadSettings() {
         with(getSharedPreferences("setting", MODE_PRIVATE)) {
-            cameraMAC.set(getString("cameraMAC", null))
-            cameraName.set(getString("cameraName", null))
-            locEnable.set(getBoolean("locEnable", false))
-            faithMode.set(getBoolean("faithMode", false))
+            for (i in 0..CAMERA_SLOTS-1) {
+                cameras[i].name.set(runCatching { getString("cameraName$i", null) }.getOrNull())
+                cameras[i].type.set(runCatching { getString("cameraType$i", null) }.getOrNull())
+                cameras[i].clazz.set(runCatching { getString("cameraClass$i", null) }.getOrNull())
+                cameras[i].mac.set(runCatching { getString("cameraMac$i", null) }.getOrNull())
+            }
+            locEnable.set(runCatching { getBoolean("locEnable", false) }.getOrNull() == true)
+            faithMode.set(runCatching { getInt("faithMode", 1) }.getOrNull()?:1)
         }
     }
     private fun saveSettings() {
         getSharedPreferences("setting", MODE_PRIVATE).edit {
-            putString("cameraMAC", cameraMAC.get())
-            putString("cameraName", cameraName.get())
+            for (i in 0..CAMERA_SLOTS-1) {
+                putString("cameraName$i", cameras[i].name.get())
+                putString("cameraType$i", cameras[i].type.get())
+                putString("cameraClass$i", cameras[i].clazz.get())
+                putString("cameraMac$i", cameras[i].mac.get())
+            }
             putBoolean("locEnable", locEnable.get())
-            putBoolean("faithMode", faithMode.get())
+            putInt("faithMode", faithMode.get())
         }
     }
+
+    // start or update services
     private fun commandService(type:String) {
         startForegroundService(Intent(this, MainService::class.java).apply {
             putExtra("type", type)
-            putExtra("cameraMAC", cameraMAC.get())
+            for (i in 0..CAMERA_SLOTS-1) {
+                putExtra("cameraClass$i", cameras[i].clazz.get())
+                putExtra("cameraMac$i", cameras[i].mac.get())
+            }
             putExtra("locEnable", locEnable.get())
             putExtra("faithMode", faithMode.get())
         })
     }
+
     // message from others, should be register/unregister on create/destroy
     private val broadcastFilter=IntentFilter(MainService.broadcastAction)
     private val broadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == MainService.broadcastAction) {
-                if (intent.hasExtra("ready"))
-                    ready.set(intent.getBooleanExtra("ready", false))
-                if (intent.hasExtra("canRemote"))
-                    canRemote.set(intent.getBooleanExtra("canRemote", false))
+                for (i in 0..CAMERA_SLOTS-1) {
+                    if (intent.hasExtra("ready$i"))
+                        cameras[i].ready.set(intent.getBooleanExtra("ready$i", false))
+                    if (intent.hasExtra("remoteFeatures$i"))
+                        cameras[i].remoteFeatures.set(intent.getStringExtra("remoteFeatures$i") ?: "")
+                }
                 if (intent.hasExtra("longitude"))
-                    longitude.set(intent.getStringExtra("longitude"))
+                    longitude.set(intent.getStringExtra("longitude")?:"")
                 if (intent.hasExtra("latitude"))
-                    latitude.set(intent.getStringExtra("latitude"))
+                    latitude.set(intent.getStringExtra("latitude")?:"")
+                if (intent.hasExtra("altitude"))
+                    altitude.set(intent.getStringExtra("altitude")?:"")
                 if (intent.hasExtra("lastSyncTime"))
-                    lastSyncTime.set(intent.getStringExtra("lastSyncTime"))
+                    lastSyncTime.set(intent.getStringExtra("lastSyncTime")?:"")
             }
         }
     }
+
     // runtime permissions
     private fun checkPermissionsAndStartService() {
         val need=arrayOf(
@@ -111,20 +146,20 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
         super.onCreate(savedInstanceState)
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
         binding.model = this
-        // get version name from package info
-        versionName= packageManager.getPackageInfo(packageName, 0).versionName?:""
         // load settings
         loadSettings()
         // start service
         checkPermissionsAndStartService()
-        // hooks for fields, cameraName is excluded coz it's for showing only
+        // hooks for fields, cameraName/cameraType is excluded coz it's with cameraMAC
         val propertyChangedCallback = object : OnPropertyChangedCallback() {
             override fun onPropertyChanged(sender: Observable?, propertyId: Int) {
                 saveSettings()
                 commandService("update")
             }
         }
-        cameraMAC.addOnPropertyChangedCallback(propertyChangedCallback)
+        for (i in 0..CAMERA_SLOTS-1) {
+            cameras[i].mac.addOnPropertyChangedCallback(propertyChangedCallback)
+        }
         locEnable.addOnPropertyChangedCallback(propertyChangedCallback)
         faithMode.addOnPropertyChangedCallback(propertyChangedCallback)
         // camera down-up (non-click) buttons
@@ -140,46 +175,61 @@ class MainActivity:AppActivity<ActivityMainBinding>(R.layout.activity_main) {
                 activityResultRegistry.register(
                     System.currentTimeMillis().toString(),
                     ActivityResultContracts.StartActivityForResult()
-                ) { _-> }.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+                ){}.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
             }
     }
     override fun onDestroy() {
         unregisterReceiver(broadcastReceiver)
         super.onDestroy()
     }
+
     // button functions
     fun onExit() {
         commandService("stop")
         finish()
     }
-    fun onScan() {
+    fun onScan(slot: Int) {
+        getResources().getColor(R.color.primary, null)
         activityResultRegistry.register(
             System.currentTimeMillis().toString(),
             ActivityResultContracts.StartActivityForResult()
         ) {
-            it?.takeIf { it.resultCode == RESULT_OK }
+            it ?.takeIf { it.resultCode == RESULT_OK }
                 ?.data ?.let {
-                    cameraName.set(it.getStringExtra("name"))
-                    cameraMAC.set(it.getStringExtra("mac"))
+                    val mac=it.getStringExtra("mac")
+                    // check if it already exists in other slot
+                    for (i in 0..CAMERA_SLOTS-1) {
+                        if (i!=slot && mac!=null && mac.uppercase()==cameras[i].mac.get()?.uppercase()) {
+                            Toast.makeText(this, R.string.scan_exist, Toast.LENGTH_LONG).show()
+                            return@let
+                        }
+                    }
+                    cameras[slot].type.set(it.getStringExtra("type"))
+                    cameras[slot].name.set(it.getStringExtra("name"))
+                    cameras[slot].clazz.set(it.getStringExtra("class"))
+                    // must be set after name/type, this will cause updating/save, which will use name/type/class
+                    cameras[slot].mac.set(mac)
                 }
         }.launch(Intent(this, ScanActivity::class.java))
     }
-    private fun sendRemote(remote:ByteArray) {
+    private fun sendRemote(remote:String, active:Boolean) {
         startForegroundService(Intent(this, MainService::class.java).apply {
             putExtra("type", "remote")
+            putExtra("slot", 0) // only the first camera is remotely controlled
             putExtra("remote", remote)
+            putExtra("active", active)
         })
     }
     fun onZoomW(down:Boolean) {
-        sendRemote(if (down) SonyCam.REMOTE_WIDE_DOWN else SonyCam.REMOTE_WIDE_UP)
+        sendRemote("Wide", down)
     }
     fun onZoomT(down:Boolean) {
-        sendRemote(if (down) SonyCam.REMOTE_TELE_DOWN else SonyCam.REMOTE_TELE_UP)
+        sendRemote("Tele", down)
     }
     fun onFocus(down:Boolean) {
-        sendRemote(if (down) SonyCam.REMOTE_FOCUS_DOWN else SonyCam.REMOTE_FOCUS_UP)
+        sendRemote("Focus", down)
     }
     fun onShot(down:Boolean) {
-        sendRemote(if (down) SonyCam.REMOTE_SHOT_DOWN else SonyCam.REMOTE_SHOT_UP)
+        sendRemote("Shot", down)
     }
 }

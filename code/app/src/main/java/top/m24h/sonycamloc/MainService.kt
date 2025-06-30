@@ -7,9 +7,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothGatt
-import android.bluetooth.BluetoothGattCharacteristic
-import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -21,6 +18,7 @@ import android.os.PowerManager
 import android.util.Log
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.MainScope
@@ -30,25 +28,24 @@ import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.actor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
-import top.m24h.android.BLE
 import top.m24h.android.Location
+import top.m24h.android.resourceLoader
 import java.text.DateFormat
 import java.util.Date
 
-private const val delay_failure=3000L
-private const val timeout_write=5000L
-private const val timeout_mtu_discovery=20000L
-private const val timeout_faith=2500L
-private const val retry_faith=2
-private const val timeout_toggle_location=60000L
+private const val CAMERA_SLOTS = 3
+
+private const val NOTIFY_ID=47
+private const val TIMEOUT_TOGGLE_LOCATION=60000L
+private const val DELAY_FAILURE=10000L
 
 class MainService : Service() {
     companion object {
         val broadcastAction = MainService::class.qualifiedName!!
     }
-    // data from resource
+
+    // setting from resources
     val interval_location   :Int    by resourceLoader()
     val timeout_location    :Int    by resourceLoader()
     val interval_ticker     :Int    by resourceLoader()
@@ -57,16 +54,30 @@ class MainService : Service() {
     val channel_name        :String by resourceLoader()
     val channel_description :String by resourceLoader()
     val service_notify      :String by resourceLoader()
-    // data maintained by others
-    var cameraMAC:String? =null
-    var locEnable =false
-    var faithMode =false
+
     // async jobs
     private val mainScope = MainScope()
     private lateinit var loopActor : SendChannel<Unit>
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun activeLoop()
+            = loopActor.trySend(Unit)
+
+    // camera slots, status notify will active main loop
+    val cameras = List(CAMERA_SLOTS) { CameraSlot(this, mainScope) { activeLoop() } }
+
+    // location provider
+    private var locationOrder = 0
+    private val location = Location(this) {
+        if (locationOrder<Int.MAX_VALUE) locationOrder++
+        // geo-tag using current location
+        for (cam in cameras) cam.setLocation(it.location, locationOrder)
+        activeLoop()
+    }
+
     // for keeping alive
     private lateinit var alarmIntent : PendingIntent
     private lateinit var wakeLock : PowerManager.WakeLock
+
     // receive message from others, should be register/unregister on create/destroy
     private val broadcastFilter=IntentFilter().apply {
         addAction(Intent.ACTION_SCREEN_ON)
@@ -78,20 +89,23 @@ class MainService : Service() {
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
-                BluetoothAdapter.ACTION_STATE_CHANGED -> {
-                    // if bluetooth is turned off, close current connection
-                    when (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.STATE_ON)) {
-                        BluetoothAdapter.STATE_OFF -> bleClose()
-                    }
+                BluetoothAdapter.ACTION_STATE_CHANGED -> when (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.STATE_ON)) {
+                    BluetoothAdapter.STATE_TURNING_OFF -> for (cam in cameras) cam.reset()
+                    BluetoothAdapter.STATE_ON -> for (cam in cameras) cam.activeLoop()
+                }
+                LocationManager.PROVIDERS_CHANGED_ACTION -> activeLoop()
+                else -> {
+                    for (cam in cameras) cam.activeLoop()
+                    activeLoop()
                 }
             }
-            activeLoop()
         }
     }
+
     // foreground service functions
     private fun createNotifyChannel() {
-        (application.getSystemService(NOTIFICATION_SERVICE) as NotificationManager?)
-            ?.createNotificationChannel(
+        (application.getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
+            .createNotificationChannel(
                 NotificationChannel(
                     channel_id,
                     channel_name,
@@ -102,33 +116,30 @@ class MainService : Service() {
             )
     }
     private fun runForeground() {
-        try {
-            startForeground (
-                47,
-                NotificationCompat.Builder(this, channel_id)
-                    .setSmallIcon(R.drawable.notify_icon)
-                    .setContentText(service_notify)
-                    .setPriority(NotificationCompat.PRIORITY_HIGH)
-                    .setContentIntent(PendingIntent.getActivity(
-                        this,
-                        System.currentTimeMillis().toInt(),
-                        Intent(this, MainActivity::class.java).apply {
-                            flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                        },
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
-                    .build(),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-                        or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-            )
-        } catch (e: Exception) {
-            Log.e("MainService.runForeground", "Exception", e)
-        }
+        startForeground (
+            NOTIFY_ID,
+            NotificationCompat.Builder(this, channel_id)
+                .setSmallIcon(R.drawable.notify_icon)
+                .setContentText(service_notify)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(PendingIntent.getActivity(
+                    this,
+                    System.currentTimeMillis().toInt(),
+                    Intent(this, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                    },
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+                .build(),
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                    or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+        )
     }
+
     // on create / destroy
     @OptIn(ObsoleteCoroutinesApi::class) // for Actor ReceiveChannel
     @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_CONNECT,
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION])
+                                 Manifest.permission.ACCESS_FINE_LOCATION,
+                                 Manifest.permission.ACCESS_COARSE_LOCATION])
     override fun onCreate() {
         super.onCreate()
         // become foreground service
@@ -137,14 +148,17 @@ class MainService : Service() {
         // main working loop
         loopActor=mainScope.actor<(Unit)>(capacity=1)  {
             while (isActive) {
-                channel.receive()
                 try {
+                    if (channel.receiveCatching().getOrNull()==null) break
                     loop()
+                    delay(1000L) // merge frequent events
+                } catch (_:CancellationException) {
+                    break
                 } catch (e:Exception) {
                     Log.e("MainService.onCreate", "Exception in loop()", e)
                     location.stop()
-                    bleClose()
-                    delay(delay_failure)
+                    delay(DELAY_FAILURE)
+                    activeLoop()
                 }
             }
         }
@@ -152,43 +166,44 @@ class MainService : Service() {
         registerReceiver(broadcastReceiver, broadcastFilter)
         // try to use alarm to keep alive
         alarmIntent = PendingIntent.getService(this, 0,
-                    Intent(this, MainService::class.java).putExtra("type", "alarm"),
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            Intent(this, javaClass).putExtra("type", "alarm"),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         (getSystemService(ALARM_SERVICE) as AlarmManager)
             .setRepeating(AlarmManager.RTC_WAKEUP , System.currentTimeMillis()+5000,
-                            interval_ticker*1000L, alarmIntent)
+                interval_ticker*1000L, alarmIntent)
         // try to keep CPU alive when connected
         wakeLock=(getSystemService(POWER_SERVICE) as PowerManager).newWakeLock(
-                    PowerManager.PARTIAL_WAKE_LOCK or PowerManager.LOCATION_MODE_NO_CHANGE,
-                    "$packageName:wake")
-        // try to start
-        activeLoop()
+            PowerManager.PARTIAL_WAKE_LOCK or PowerManager.LOCATION_MODE_NO_CHANGE,
+            "$packageName:wake")
+        // start camera slot async job
+        for (cam in cameras) cam.start()
     }
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override fun onDestroy() {
-        mainScope.cancel()
         if (wakeLock.isHeld) wakeLock.release()
-        (getSystemService(ALARM_SERVICE) as AlarmManager?)?.cancel(alarmIntent)
+        (getSystemService(ALARM_SERVICE) as AlarmManager).cancel(alarmIntent)
         unregisterReceiver(broadcastReceiver)
         location.stop()
-        bleClose()
+        for (cam in cameras) cam.stop()
+        mainScope.cancel()
         super.onDestroy()
     }
-    // as bind service
+
+    // should not be used as bind service
     override fun onBind(intent: Intent?): IBinder? {
         return null
     }
+
     // process commands
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.getStringExtra("type")) {
             "remote"-> {
-                intent.getByteArrayExtra("remote")?.let { bytes->
-                    characteristicRemote?.let {
-                        mainScope.launch(start=CoroutineStart.UNDISPATCHED) {
-                            ble?.write(it, bytes, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT, timeout_write)
-                        }
-                    }
+                val slot=intent.getIntExtra("slot", 0)
+                val remote=intent.getStringExtra("remote")?:""
+                val active=intent.getBooleanExtra("active", false)
+                if (slot>=0 && slot<CAMERA_SLOTS) mainScope.launch(start=CoroutineStart.UNDISPATCHED) {
+                    cameras[slot].remote(remote, active)
                 }
             }
             "stop"-> {
@@ -196,165 +211,67 @@ class MainService : Service() {
                 return START_NOT_STICKY
             }
             "start", "update" -> {
-                if (intent.hasExtra("cameraMAC") == true) {
-                    val cameraMACNew = intent.getStringExtra("cameraMAC")
-                    if (cameraMAC!=cameraMACNew) {
-                        bleClose()
-                        cameraMAC=cameraMACNew
-                    }
+                if (intent.hasExtra("locEnable")) {
+                    val locEnable = intent.getBooleanExtra("locEnable", false)
+                    for (cam in cameras) cam.locEnable = locEnable
                 }
-                locEnable = intent.getBooleanExtra("locEnable", locEnable)
-                faithMode = intent.getBooleanExtra("faithMode", faithMode)
+                if (intent.hasExtra("faithMode")) {
+                    val faithMode = intent.getIntExtra("faithMode", 1)
+                    for (cam in cameras) cam.faithMode = faithMode
+                }
+                for (i in 0..CAMERA_SLOTS-1) {
+                    if (intent.hasExtra("cameraMac$i"))
+                        cameras[i].setMac(intent.getStringExtra("cameraMac$i"), intent.getStringExtra("cameraClass$i"))
+                }
                 activeLoop()
             }
-            "alarm" -> activeLoop()
+            "alarm" -> {
+                for (cam in cameras) cam.activeLoop()
+                activeLoop()
+            }
         }
         return START_STICKY
     }
+
     // main loop
-    private var characteristicGpsData : BluetoothGattCharacteristic? =null
-    private var characteristicGps30   : BluetoothGattCharacteristic? =null
-    private var characteristicGps31   : BluetoothGattCharacteristic? =null
-    private var characteristicGpsTime : BluetoothGattCharacteristic? =null
-    private var characteristicGpsZone : BluetoothGattCharacteristic? =null
-    private var characteristicRemote  : BluetoothGattCharacteristic? =null
-    private var lastConnectedTime = 0L
-    private var lastSyncTime : String? =null
-    private var discovered = false
-    private var mtuDone = false
-    private var cameraInitialized = false
-    private var retryCount = 0
+    private var lastConnectedTime =0L
     @RequiresPermission(allOf=[Manifest.permission.BLUETOOTH_CONNECT,
-                               Manifest.permission.ACCESS_FINE_LOCATION,
-                               Manifest.permission.ACCESS_COARSE_LOCATION])
+        Manifest.permission.ACCESS_FINE_LOCATION,
+        Manifest.permission.ACCESS_COARSE_LOCATION])
     private suspend fun loop() {
-        // if gatt is not created, try to connect device (auto-connect)
-        ble=ble ?:
-            cameraMAC?.takeIf { it.isNotEmpty() }
-            ?.let {
-                (getSystemService(BLUETOOTH_SERVICE) as BluetoothManager?)
-                    ?.adapter?.takeIf { it.isEnabled && it.state == BluetoothAdapter.STATE_ON }
-                    ?.getRemoteDevice(it)
-                    ?.let { BLE.open(this, it, true) { connected ->
-                            if (connected)  {
-                                try { ble?.gatt?.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
-                                } catch(_:Exception){}
-                            }
-                            activeLoop()
-                        } }
-            }
-        ble?.takeIf { it.isConnected } ?.also { ble ->
-            if (!wakeLock.isHeld) wakeLock.acquire(wakelock_time*1000L)
-            joinAll(
-                mainScope.launch {
-                    // check if location is needed to start
-                    if (locEnable && !location.isStarted()) {
-                        if (location.start(interval_location*1000L, timeout_location*1000L)) {
-                            location.waitForLocationData(timeout_write)
-                        } else {
-                            delay(delay_failure)
-                            activeLoop() // try again
-                        }
-                    }
-                },
-                mainScope.launch {
-                    // even if the operation fails, it does not affect the functionality
-                    // on my Android 13 phone, normally BLE interval is 36, and for more than 200 discovery records, it takes about 9 seconds
-                    // if MTU request can be done before underlying discovery, it takes only 3 seconds
-                    // and sometimes timeout/reconnecting can cause Android to choose a smallest interval 6, it takes only 2 seconds
-                    //try { ble.gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
-                    //} catch(_:Exception){}
-                    mtuDone = mtuDone || (ble.isConnected && ble.requestMtu(517, // 517 is from Android 14
-                        if (faithMode && retryCount++<retry_faith) timeout_faith
-                        else timeout_mtu_discovery)!=null)
-                    if (!mtuDone) ble.disconnect()
-                    // discovery services
-                    if (!discovered && ble.isConnected) {
-                        if (ble.discoveryServices(timeout_mtu_discovery) == BluetoothGatt.GATT_SUCCESS) {
-                            val srvRemote = ble.gatt.getService(SonyCam.SERVICE_REMOTE)
-                            characteristicRemote = srvRemote?.getCharacteristic(SonyCam.CHAR_REMOTE_WRITE)
-                            val srvGPS = ble.gatt.getService(SonyCam.SERVICE_GPS)
-                            characteristicGpsData = srvGPS?.getCharacteristic(SonyCam.CHAR_GPS_DATA)
-                            characteristicGps30 = srvGPS?.getCharacteristic(SonyCam.CHAR_GPS_SET30)
-                            characteristicGps31 = srvGPS?.getCharacteristic(SonyCam.CHAR_GPS_SET31)
-                            characteristicGpsTime = srvGPS?.getCharacteristic(SonyCam.CHAR_GPS_SET_TIME)
-                            characteristicGpsZone = srvGPS?.getCharacteristic(SonyCam.CHAR_GPS_SET_ZONE)
-                            discovered=true
-                        } else
-                            ble.disconnect()
-                    }
-                    // initialize camera to receive location,
-                    // Maybe this is not needed with the camera before the A7CR,
-                    // but I only had the A7CR and tried to make compatible with the older cameras
-                    if (!cameraInitialized  && ble.isConnected) {
-                        cameraInitialized = characteristicGpsData==null ||
-                                (    characteristicGps30  ?.let{ble.write(it, SonyCam.GPS_ENABLE, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT, timeout_write)==BluetoothGatt.GATT_SUCCESS}!=false
-                                  && characteristicGps31  ?.let{ble.write(it, SonyCam.GPS_ENABLE, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT, timeout_write)==BluetoothGatt.GATT_SUCCESS}!=false
-                                  && characteristicGpsTime?.let{ble.write(it, SonyCam.GPS_ENABLE, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT, timeout_write)==BluetoothGatt.GATT_SUCCESS}!=false
-                                  && characteristicGpsZone?.let{ble.write(it, SonyCam.GPS_DISABLE, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT, timeout_write)==BluetoothGatt.GATT_SUCCESS}!=false)
-                        if (!cameraInitialized) ble.disconnect()
-                    }
+        if (cameras.any { it.isConnected }) {
+            lastConnectedTime = System.currentTimeMillis()
+            if (!wakeLock.isHeld) wakeLock.acquire(wakelock_time * 1000L)
+            if (cameras.any { it.locEnable } && !location.isStarted) {
+                if (!location.start(interval_location * 1000L, timeout_location * 1000L)) {
+                    delay(DELAY_FAILURE)
+                    activeLoop() // try again
                 }
-            )
-            lastConnectedTime=System.currentTimeMillis()
-        }
-        // if disconnected or closed
-        if (ble?.isConnected!=true) {
-            retryCount = 0
-            mtuDone = false
-            discovered = discovered && ble!=null && faithMode
-            cameraInitialized = false
+            }
+        } else {
             // not to toggle location off so rapidly since re-connecting may be needed
             // location updating/alarm intent/power key/... can trigger this after disconnected
-            if (System.currentTimeMillis() - lastConnectedTime > timeout_toggle_location ) {
+            if (System.currentTimeMillis() - lastConnectedTime > TIMEOUT_TOGGLE_LOCATION) {
                 if (wakeLock.isHeld) wakeLock.release()
-                if (location.isStarted()) location.stop()
-                lastSyncTime = null
+                if (location.isStarted) location.stop()
+                locationOrder=0
             }
         }
-        // if location is not enabled
-        if (!locEnable && location.isStarted()) {
-            location.stop()
-            lastSyncTime = null
-        }
-        // current location
-        val loc=location.location
-        // send GPS data to camera
-        ble?.takeIf{it.isConnected && cameraInitialized && locEnable && loc!=null}?.also { ble ->
-            if (characteristicGpsData?.let {
-                ble.write(it,
-                    SonyCam.makeGPSData(loc!!.longitude, loc.latitude, System.currentTimeMillis() + 600), // make up for lost time
-                    BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT, timeout_write
-                )} == BluetoothGatt.GATT_SUCCESS ){
-                lastSyncTime = DateFormat.getTimeInstance(DateFormat.MEDIUM).format(Date())
-            }
-        }
-        // send to main activity
+
+        // send current status to main activity
         sendBroadcast(Intent(broadcastAction).apply {
             flags=Intent.FLAG_RECEIVER_REPLACE_PENDING or Intent.FLAG_RECEIVER_REGISTERED_ONLY
             setPackage(MainActivity::class.java.packageName)
-            putExtra("ready", cameraInitialized)
-            putExtra("canRemote", characteristicRemote!=null)
+            for (i in 0..CAMERA_SLOTS-1) {
+                putExtra("ready$i", cameras[i].ready)
+                putExtra("remoteFeatures$i", cameras[i].remoteFeatures)
+            }
+            val loc=location.location?.takeIf {cameras.any {it.locEnable} }
             putExtra("longitude", Location.convertDMS(loc?.longitude, " E", " W"))
             putExtra("latitude", Location.convertDMS(loc?.latitude, " N", " S"))
-            putExtra("lastSyncTime", lastSyncTime)
+            putExtra("altitude", loc?.takeIf{it.hasAltitude()}?.altitude?.let{"%.2f".format(it)})
+            val lastSyncTime=cameras.maxOf { it.lastSyncTime ?: 0L}
+            putExtra("lastSyncTime", if (lastSyncTime>0L) DateFormat.getTimeInstance(DateFormat.MEDIUM).format(Date(lastSyncTime)) else "")
         })
-    }
-    // send to loopActor to active loop()
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private fun activeLoop() {
-        if (!loopActor.isClosedForSend) loopActor.trySend(Unit)
-    }
-    // location
-    private val location = Location(this) { activeLoop() }
-    // bluetooth
-    private var ble : BLE? =null
-    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    private fun bleClose() {
-        ble?.close()
-        ble=null
-        mtuDone=false
-        cameraInitialized=false
-        discovered=false
     }
 }

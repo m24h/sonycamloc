@@ -1,5 +1,3 @@
-import com.android.build.gradle.internal.scope.publishBuildArtifacts
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -13,8 +11,8 @@ android {
         applicationId = "top.m24h.sonycamloc"
         minSdk = 33
         targetSdk = 33
-        versionCode = 15
-        versionName = "1.32"
+        versionCode = 16
+        versionName = "2.00"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -37,6 +35,7 @@ android {
     }
 
     buildFeatures {
+        //noinspection DataBindingWithoutKapt
         dataBinding = true
     }
     buildToolsVersion = "35.0.0"
