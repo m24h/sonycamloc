@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Camera Geo</string>
+    <string name="app_name">Camera Geo-Tagger</string>
     <string name="service_notify">Keep this notification to hold running</string>
     <string name="channel_id" translatable="false">top.m24h.sonycamloc</string>
     <string name="channel_name" translatable="false">Camera GeoTag</string>

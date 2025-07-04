@@ -89,10 +89,10 @@ class ScanActivity : AppActivity<ActivityScanBinding>(R.layout.activity_scan)
         val scanResult=listViewAdapter.data.elementAt(pos)
         val type=Camera.type(scanResult.scanRecord?.manufacturerSpecificData)
         if (type==null) {
-            Toast.makeText(this, R.string.ble_unknown_device, Toast.LENGTH_LONG).show()
+            Toast.makeText(this, R.string.ble_unknown_device, Toast.LENGTH_SHORT).show()
             binding.deviceList.isEnabled = true
         } else if (type.needBind && scanResult.device.bondState!=BluetoothDevice.BOND_BONDED) {
-            Toast.makeText(this, R.string.ble_need_pair, Toast.LENGTH_LONG).show()
+            Toast.makeText(this, R.string.ble_need_pair, Toast.LENGTH_SHORT).show()
             binding.deviceList.isEnabled = true
         } else {
             setResult(RESULT_OK, Intent()

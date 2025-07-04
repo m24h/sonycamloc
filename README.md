@@ -1,4 +1,4 @@
-# Camera Geo (original: Sony Camera Location Tool)
+# Camera Geo-Tagger (original: Sony Camera Location Tool)
 
 An android App for geo-tag and remote control on cameras. This App tries to make the best possible speed of location and the stability of the connection to camera.
 

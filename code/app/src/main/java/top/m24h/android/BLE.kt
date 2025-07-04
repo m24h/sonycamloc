@@ -110,15 +110,9 @@ class BLE private constructor(val handler:Handler,
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
         super.onConnectionStateChange(gatt, status, newState)
-        val connected = newState==BluetoothProfile.STATE_CONNECTED
+        _isConnected = newState==BluetoothProfile.STATE_CONNECTED
+        onConnect?.invoke(this, _isConnected)
         resume(null)
-        if (connected!=isConnected) {
-            _isConnected = connected
-            handler.post {
-                onConnect?.invoke(this, isConnected)
-                if (autoConnect && !isConnected)  connect()
-            }
-        }
     }
 
     /**

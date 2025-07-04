@@ -123,6 +123,7 @@ class CameraSlot (val context:Context, val asyncScope:CoroutineScope,
             }.getOrNull() ?.let {
                 BLE.open(context, it, true) {
                     if (it) runCatching { gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH) }
+                    else { connect() } // always try to connect in background, even when disconnected by self in faith mode
                     onStatusChange(this@CameraSlot) // connection status is changed
                     activeLoop()
                 } ?.apply {
